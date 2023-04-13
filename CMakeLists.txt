@@ -4,3 +4,8 @@ project(mandoline2d)
 set(CMAKE_CXX_STANDARD 20)
 
 add_executable(mandoline2d main.cpp)
+
+target_compile_options(mandoline2d PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/W3 /WX>
+        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
+        )
