@@ -1,3 +1,4 @@
+#include "half_edge.h"
 #include <array>
 #include <cmath>
 #include <fstream>
