@@ -4,22 +4,23 @@ project(mandoline2d)
 set(CMAKE_CXX_STANDARD 20)
 
 add_executable(mandoline2d
-        main.cpp
-        half_edge.cpp
-        deps/imgui/imgui.cpp
-        deps/imgui/imgui_demo.cpp
-        deps/imgui/imgui_draw.cpp
-        deps/imgui/imgui_tables.cpp
-        deps/imgui/imgui_widgets.cpp
-        deps/imgui/backends/imgui_impl_glfw.cpp
-        deps/imgui/backends/imgui_impl_opengl3.cpp
-        deps/glad/src/gl.c
+        ${PROJECT_SOURCE_DIR}/main.cpp
+        ${PROJECT_SOURCE_DIR}/half_edge.cpp
+        ${PROJECT_SOURCE_DIR}/deps/imgui/imgui.cpp
+        ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_demo.cpp
+        ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_draw.cpp
+        ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_tables.cpp
+        ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_widgets.cpp
+        ${PROJECT_SOURCE_DIR}/deps/imgui/backends/imgui_impl_glfw.cpp
+        ${PROJECT_SOURCE_DIR}/deps/imgui/backends/imgui_impl_opengl3.cpp
+        ${PROJECT_SOURCE_DIR}/deps/glad/src/gl.c
         )
 
 target_include_directories(mandoline2d PRIVATE
-        deps/imgui
-        deps/imgui/backends
-        deps/glad/include
+        ${PROJECT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/deps/imgui
+        ${PROJECT_SOURCE_DIR}/deps/imgui/backends
+        ${PROJECT_SOURCE_DIR}/deps/glad/include
         )
 
 find_package(OpenGL REQUIRED)
