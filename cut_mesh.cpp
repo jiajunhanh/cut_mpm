@@ -200,9 +200,9 @@ construct_cut_mesh(const std::vector<std::array<float, 2>> &vertices,
                   });
         for (size_t i = 0; i < half_edges.size(); ++i) {
             size_t j = (i + 1) % half_edges.size();
-            auto h0 = half_edges[i];
-            auto h1 = half_edges[j];
-            h0->twin->next = h1;
+            auto h0 = half_edges[sorted_idx[i]];
+            auto h1 = half_edges[sorted_idx[j]];
+            h1->twin->next = h0;
         }
     }
 
