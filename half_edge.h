@@ -1,7 +1,10 @@
 #pragma once
 
+#include <Eigen/Dense>
 #include <iostream>
 #include <list>
+#include <stack>
+#include <vector>
 
 class HalfEdgeMesh {
     size_t next_id{};
@@ -47,6 +50,7 @@ class HalfEdgeMesh {
       public:
         HalfEdgeRef half_edge;
         size_t id{};
+        Eigen::Vector2f position{};
     };
 
     class Face {
@@ -60,13 +64,20 @@ class HalfEdgeMesh {
     std::list<Edge> edges;
     std::list<Face> faces;
 
+  private:
+    std::stack<HalfEdgeRef> recycled_half_edges;
+    std::stack<VertexRef> recycled_vertices;
+    std::stack<EdgeRef> recycled_edges;
+    std::stack<FaceRef> recycled_faces;
+
+  public:
     HalfEdgeRef emplace_half_edge();
     VertexRef emplace_vertex();
     EdgeRef emplace_edge();
     FaceRef emplace_face();
 
-    void free_half_edge(HalfEdgeRef h);
-    void free_vertex(VertexRef v);
-    void free_edge(EdgeRef e);
-    void free_face(FaceRef f);
+    void erase_half_edge(HalfEdgeRef h);
+    void erase_vertex(VertexRef v);
+    void erase_edge(EdgeRef e);
+    void erase_face(FaceRef f);
 };

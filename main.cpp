@@ -1,4 +1,4 @@
-#include "cut_cell.h"
+#include "cut_mesh.h"
 #include "half_edge.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -23,7 +23,7 @@ static void glfw_error_callback(int error, const char *description) {
     fmt::print(std::cerr, "GLFW Error {}: {}\n", error, description);
 }
 
-static void show_cut_cell() {
+static void show_cut_mesh() {
     constexpr float canvas_width = 600.0f;
     const ImGuiViewport *main_viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(
@@ -35,7 +35,8 @@ static void show_cut_cell() {
         return;
     }
 
-    static std::vector<ImVec2> points;
+    static std::vector<std::array<float, 2>> vertices;
+    static std::vector<std::array<size_t, 2>> edges;
     static bool opt_enable_grid = true;
     static bool opt_draw_cut_vertices = true;
     static bool opt_draw_cut_edges = true;
@@ -72,14 +73,18 @@ static void show_cut_cell() {
 
     if (is_hovered && !adding_line &&
         ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        if (points.empty()) {
-            points.emplace_back(mouse_pos_in_canvas);
+        if (vertices.empty()) {
+            vertices.emplace_back(
+                std::array{mouse_pos_in_canvas.x / canvas_width,
+                           mouse_pos_in_canvas.y / canvas_width});
         }
-        points.emplace_back(mouse_pos_in_canvas);
+        vertices.emplace_back(std::array{mouse_pos_in_canvas.x / canvas_width,
+                                         mouse_pos_in_canvas.y / canvas_width});
         adding_line = true;
     }
     if (adding_line) {
-        points.back() = mouse_pos_in_canvas;
+        vertices.back() = std::array{mouse_pos_in_canvas.x / canvas_width,
+                                     mouse_pos_in_canvas.y / canvas_width};
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
             adding_line = false;
     }
@@ -88,38 +93,33 @@ static void show_cut_cell() {
     ImGui::OpenPopupOnItemClick("context", ImGuiPopupFlags_MouseButtonRight);
     if (ImGui::BeginPopup("context")) {
         if (adding_line)
-            points.resize(points.size() - 1);
+            vertices.resize(vertices.size() - 1);
         adding_line = false;
-        if (ImGui::MenuItem("Remove one", nullptr, false, !points.empty())) {
-            points.resize(points.size() - 1);
-            if (points.size() == 1) {
-                points.clear();
+        if (ImGui::MenuItem("Remove one", nullptr, false, !vertices.empty())) {
+            vertices.resize(vertices.size() - 1);
+            if (vertices.size() == 1) {
+                vertices.clear();
             }
         }
-        if (ImGui::MenuItem("Remove all", nullptr, false, !points.empty())) {
-            points.clear();
+        if (ImGui::MenuItem("Remove all", nullptr, false, !vertices.empty())) {
+            vertices.clear();
         }
         ImGui::EndPopup();
     }
 
-    // Construct cut-cell
-    std::vector<Vertex> vertices;
-    std::vector<Edge> edges;
-    for (size_t i = 0; i < points.size(); ++i) {
-        Vertex v{};
-        for (int d = 0; d < 2; ++d) {
-            points[i][d] = std::clamp(points[i][d], 0.0f, canvas_width - 0.1f);
-            auto x = points[i][d] / canvas_width * static_cast<float>(n_grid);
-            v.c[d] = static_cast<int>(std::floor(x));
-            v.q[d] = x - std::floor(x);
-            v.b[d] = (v.q[d] == 0.0f);
-        }
-        vertices.emplace_back(v);
-        auto j = (i + 1) % points.size();
-        edges.emplace_back(Edge{i, j});
+    // Construct cut-mesh
+    for (auto &v : vertices) {
+        v[0] = std::clamp(v[0], 0.0f,
+                          1.0f - std::numeric_limits<float>::epsilon());
+        v[1] = std::clamp(v[1], 0.0f,
+                          1.0f - std::numeric_limits<float>::epsilon());
     }
-    auto [cut_vertices, cut_edges] =
-        compute_cut_vertices_and_edges(vertices, edges);
+    edges.clear();
+    for (size_t i = 0; i < vertices.size(); ++i) {
+        auto j = (i + 1) % vertices.size();
+        edges.emplace_back(std::array{i, j});
+    }
+    auto cut_mesh = construct_cut_mesh(vertices, edges);
 
     // Draw grid + all lines in the canvas
     draw_list->PushClipRect(canvas_p0, canvas_p1, true);
@@ -140,48 +140,40 @@ static void show_cut_cell() {
                 IM_COL32(0, 0, 0, 40));
         }
     }
-    for (size_t n = 0; n + 1 < points.size(); ++n) {
+    /*for (size_t n = 0; n + 1 < vertices.size(); ++n) {
         draw_list->AddLine(
-            ImVec2(origin.x + points[n].x, origin.y + points[n].y),
-            ImVec2(origin.x + points[n + 1].x, origin.y + points[n + 1].y),
+            ImVec2(origin.x + vertices[n][0], origin.y + vertices[n][1]),
+            ImVec2(origin.x + vertices[n + 1][0],
+                   origin.y + vertices[n + 1][1]),
             IM_COL32(0, 0, 0, 255), 2.0f);
     }
-    if (points.size() >= 3) {
+    if (vertices.size() >= 3) {
         draw_list->AddLine(
-            ImVec2(origin.x + points[0].x, origin.y + points[0].y),
-            ImVec2(origin.x + points[points.size() - 1].x,
-                   origin.y + points[points.size() - 1].y),
+            ImVec2(origin.x + vertices[0][0], origin.y + vertices[0][1]),
+            ImVec2(origin.x + vertices[vertices.size() - 1][0],
+                   origin.y + vertices[vertices.size() - 1][1]),
             IM_COL32(0, 0, 0, 255), 2.0f);
-    }
+    }*/
     if (opt_draw_cut_edges) {
-        for (const auto &e : cut_edges) {
-            if (e.i < n_grid_nodes && e.j < n_grid_nodes) {
+        for (const auto &e : cut_mesh.edges) {
+            const auto &v0 = e.half_edge->vertex;
+            const auto &v1 = e.half_edge->twin->vertex;
+            if (v0->id < n_grid_nodes && v1->id < n_grid_nodes) {
                 continue;
             }
-            const auto &v0 = cut_vertices[e.i];
-            const auto &v1 = cut_vertices[e.j];
-            auto x0 = (static_cast<float>(v0.c[0]) + v0.q[0]) /
-                      static_cast<float>(n_grid) * canvas_width;
-            auto y0 = (static_cast<float>(v0.c[1]) + v0.q[1]) /
-                      static_cast<float>(n_grid) * canvas_width;
-            auto x1 = (static_cast<float>(v1.c[0]) + v1.q[0]) /
-                      static_cast<float>(n_grid) * canvas_width;
-            auto y1 = (static_cast<float>(v1.c[1]) + v1.q[1]) /
-                      static_cast<float>(n_grid) * canvas_width;
-            ImVec2 p0(origin.x + x0, origin.y + y0);
-            ImVec2 p1(origin.x + x1, origin.y + y1);
+            auto pos0 = v0->position * canvas_width;
+            auto pos1 = v1->position * canvas_width;
+            ImVec2 p0(origin.x + pos0.x(), origin.y + pos0.y());
+            ImVec2 p1(origin.x + pos1.x(), origin.y + pos1.y());
             draw_list->AddLine(p0, p1, IM_COL32(0, 0, 0, 255), 2);
         }
     }
     if (opt_draw_cut_vertices) {
-        for (size_t i = n_grid_nodes; i < cut_vertices.size(); ++i) {
-            const auto &v = cut_vertices[i];
-            auto x = (static_cast<float>(v.c[0]) + v.q[0]) /
-                     static_cast<float>(n_grid) * canvas_width;
-            auto y = (static_cast<float>(v.c[1]) + v.q[1]) /
-                     static_cast<float>(n_grid) * canvas_width;
-            draw_list->AddCircleFilled(ImVec2(origin.x + x, origin.y + y), 4,
-                                       IM_COL32(255, 0, 0, 255));
+        for (const auto &v : cut_mesh.vertices) {
+            draw_list->AddCircleFilled(
+                ImVec2(origin.x + v.position.x() * canvas_width,
+                       origin.y + v.position.y() * canvas_width),
+                4, IM_COL32(255, 0, 0, 255));
         }
     }
     draw_list->PopClipRect();
@@ -255,7 +247,7 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        show_cut_cell();
+        show_cut_mesh();
 
         // Rendering
         ImGui::Render();

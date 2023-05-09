@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 add_executable(mandoline2d
         ${PROJECT_SOURCE_DIR}/main.cpp
         ${PROJECT_SOURCE_DIR}/half_edge.cpp
-        ${PROJECT_SOURCE_DIR}/cut_cell.cpp
+        ${PROJECT_SOURCE_DIR}/cut_mesh.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_demo.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_draw.cpp
@@ -19,6 +19,7 @@ add_executable(mandoline2d
 
 target_include_directories(mandoline2d PRIVATE
         ${PROJECT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/deps/eigen
         ${PROJECT_SOURCE_DIR}/deps/imgui
         ${PROJECT_SOURCE_DIR}/deps/imgui/backends
         ${PROJECT_SOURCE_DIR}/deps/glad/include
@@ -38,6 +39,6 @@ add_subdirectory(deps/fmt)
 target_link_libraries(mandoline2d fmt::fmt)
 
 target_compile_options(mandoline2d PRIVATE
-        $<$<CXX_COMPILER_ID:MSVC>:/W3 /WX>
+        $<$<CXX_COMPILER_ID:MSVC>:/W3 /WX /wd4819>
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
         )

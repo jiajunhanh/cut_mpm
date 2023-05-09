@@ -1,5 +1,6 @@
 #pragma once
 
+#include "half_edge.h"
 #include <iostream>
 #include <vector>
 
@@ -12,8 +13,6 @@ class Vertex {
     int c[2];
     float q[2];
     bool b[2];
-
-    std::vector<size_t> edges;
 
     [[nodiscard]] float coord(int d) const {
         return static_cast<float>(c[d]) + q[d];
@@ -28,6 +27,6 @@ class Edge {
     size_t j{}; // point id
 };
 
-std::pair<std::vector<Vertex>, std::vector<Edge>>
-compute_cut_vertices_and_edges(const std::vector<Vertex> &vertices,
-                               const std::vector<Edge> &edges);
+HalfEdgeMesh
+construct_cut_mesh(const std::vector<std::array<float, 2>> &vertices,
+                   const std::vector<std::array<size_t, 2>> &edges);

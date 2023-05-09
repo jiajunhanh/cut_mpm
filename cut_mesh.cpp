@@ -1,6 +1,8 @@
-#include "cut_cell.h"
+#include "cut_mesh.h"
 #include <algorithm>
 #include <cmath>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
 
 static auto lerp(Vertex &v, const Vertex &vi, const Vertex &vj, float t,
                  int d) {
@@ -56,19 +58,12 @@ static void add_grid_edges(std::vector<Vertex> &cut_vertices,
         cut_edges.emplace_back(n_grid * (n_grid + 1) + i,
                                n_grid * (n_grid + 1) + i + 1);
     }
-    for (auto v : cut_vertices) {
-        v.edges.clear();
-    }
-    for (size_t i = 0; i < cut_edges.size(); ++i) {
-        const auto &e = cut_edges[i];
-        cut_vertices[e.i].edges.push_back(i);
-        cut_vertices[e.j].edges.push_back(i);
-    }
 }
 
 std::pair<std::vector<Vertex>, std::vector<Edge>>
-compute_cut_vertices_and_edges(const std::vector<Vertex> &vertices,
-                               const std::vector<Edge> &edges) {
+compute_cut_vertices_and_edges(
+    const std::vector<std::array<float, 2>> &vertices,
+    const std::vector<std::array<size_t, 2>> &edges) {
     std::vector<Vertex> cut_vertices;
     std::vector<Edge> cut_edges;
     for (int y = 0; y <= n_grid; ++y) {
@@ -80,11 +75,20 @@ compute_cut_vertices_and_edges(const std::vector<Vertex> &vertices,
             cut_vertices.emplace_back(v);
         }
     }
-    cut_vertices.insert(cut_vertices.end(), vertices.cbegin(), vertices.cend());
-    for (auto &e : edges) {
+    for (const auto &v : vertices) {
+        Vertex cut_vertex{};
+        for (int d = 0; d < 2; ++d) {
+            auto x = v[d] * static_cast<float>(n_grid);
+            cut_vertex.c[d] = static_cast<int>(std::floor(x));
+            cut_vertex.q[d] = x - std::floor(x);
+            cut_vertex.b[d] = (cut_vertex.q[d] == 0.0f);
+        }
+        cut_vertices.emplace_back(cut_vertex);
+    }
+    for (const auto &e : edges) {
         std::vector<std::pair<float, size_t>> intersection_points;
-        const auto &vi = vertices[e.i];
-        const auto &vj = vertices[e.j];
+        const auto vi = cut_vertices[e[0] + static_cast<size_t>(n_grid_nodes)];
+        const auto vj = cut_vertices[e[1] + static_cast<size_t>(n_grid_nodes)];
         for (int d = 0; d < 2; ++d) {
             int z_min;
             int z_max;
@@ -119,10 +123,10 @@ compute_cut_vertices_and_edges(const std::vector<Vertex> &vertices,
                       return a.first < b.first;
                   });
         if (intersection_points.empty()) {
-            cut_edges.emplace_back(e.i + n_grid_nodes, e.j + n_grid_nodes);
+            cut_edges.emplace_back(e[0] + n_grid_nodes, e[1] + n_grid_nodes);
             continue;
         }
-        cut_edges.emplace_back(e.i + n_grid_nodes,
+        cut_edges.emplace_back(e[0] + n_grid_nodes,
                                intersection_points.front().second);
         for (size_t i = 0; i + 1 < intersection_points.size(); ++i) {
             if (intersection_points[i].second ==
@@ -133,8 +137,74 @@ compute_cut_vertices_and_edges(const std::vector<Vertex> &vertices,
                                    intersection_points[i + 1].second);
         }
         cut_edges.emplace_back(intersection_points.back().second,
-                               e.j + n_grid_nodes);
+                               e[1] + n_grid_nodes);
     }
     add_grid_edges(cut_vertices, cut_edges);
     return {cut_vertices, cut_edges};
+}
+
+HalfEdgeMesh
+construct_cut_mesh(const std::vector<std::array<float, 2>> &vertices,
+                   const std::vector<std::array<size_t, 2>> &edges) {
+    auto [cut_vertices, cut_edges] =
+        compute_cut_vertices_and_edges(vertices, edges);
+
+    HalfEdgeMesh cut_mesh;
+    std::vector<HalfEdgeMesh::VertexRef> vertex_map;
+    std::vector<std::vector<HalfEdgeMesh::HalfEdgeRef>> vertex_half_edges;
+    vertex_map.reserve(cut_vertices.size());
+    vertex_half_edges.resize(cut_vertices.size());
+
+    for (const auto &cut_vertex : cut_vertices) {
+        auto v = cut_mesh.emplace_vertex();
+        for (int d = 0; d < 2; ++d) {
+            v->position[d] =
+                static_cast<float>(cut_vertex.c[d]) + cut_vertex.q[d];
+            v->position[d] /= static_cast<float>(n_grid);
+        }
+        vertex_map.emplace_back(v);
+    }
+
+    for (const auto &cut_edge : cut_edges) {
+        auto h0 = cut_mesh.emplace_half_edge();
+        auto h1 = cut_mesh.emplace_half_edge();
+        auto v0 = vertex_map[cut_edge.i];
+        auto v1 = vertex_map[cut_edge.j];
+        auto e = cut_mesh.emplace_edge();
+        h0->set_tnvef(h1, h0->next, v0, e, h0->face);
+        h1->set_tnvef(h0, h1->next, v1, e, h1->face);
+        v0->half_edge = h0;
+        v1->half_edge = h1;
+        e->half_edge = h0;
+        vertex_half_edges[v0->id].emplace_back(h0);
+        vertex_half_edges[v1->id].emplace_back(h1);
+    }
+
+    for (const auto &v : cut_mesh.vertices) {
+        auto &half_edges = vertex_half_edges[v.id];
+        std::vector<float> angles(half_edges.size());
+        for (size_t i = 0; i < half_edges.size(); ++i) {
+            auto h0 = half_edges[i];
+            auto h1 = h0->twin;
+            auto v1 = h1->vertex;
+            angles[i] = std::atan2(v1->position[1] - v.position[1],
+                                   v1->position[0] - v.position[0]);
+        }
+        std::vector<size_t> sorted_idx(half_edges.size());
+        for (size_t i = 0; i < half_edges.size(); ++i) {
+            sorted_idx[i] = i;
+        }
+        std::sort(sorted_idx.begin(), sorted_idx.end(),
+                  [&angles = angles](size_t i, size_t j) {
+                      return angles[i] < angles[j];
+                  });
+        for (size_t i = 0; i < half_edges.size(); ++i) {
+            size_t j = (i + 1) % half_edges.size();
+            auto h0 = half_edges[i];
+            auto h1 = half_edges[j];
+            h0->twin->next = h1;
+        }
+    }
+
+    return cut_mesh;
 }
