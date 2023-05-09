@@ -78,7 +78,7 @@ compute_cut_vertices_and_edges(
     for (const auto &v : vertices) {
         Vertex cut_vertex{};
         for (int d = 0; d < 2; ++d) {
-            auto x = v[d] * static_cast<float>(n_grid);
+            auto x = v[d] * n_grid;
             cut_vertex.c[d] = static_cast<int>(std::floor(x));
             cut_vertex.q[d] = x - std::floor(x);
             cut_vertex.b[d] = (cut_vertex.q[d] == 0.0f);
@@ -87,8 +87,8 @@ compute_cut_vertices_and_edges(
     }
     for (const auto &e : edges) {
         std::vector<std::pair<float, size_t>> intersection_points;
-        const auto vi = cut_vertices[e[0] + static_cast<size_t>(n_grid_nodes)];
-        const auto vj = cut_vertices[e[1] + static_cast<size_t>(n_grid_nodes)];
+        const auto vi = cut_vertices[e[0] + n_grid_nodes];
+        const auto vj = cut_vertices[e[1] + n_grid_nodes];
         for (int d = 0; d < 2; ++d) {
             int z_min;
             int z_max;
@@ -160,7 +160,7 @@ construct_cut_mesh(const std::vector<std::array<float, 2>> &vertices,
         for (int d = 0; d < 2; ++d) {
             v->position[d] =
                 static_cast<float>(cut_vertex.c[d]) + cut_vertex.q[d];
-            v->position[d] /= static_cast<float>(n_grid);
+            v->position[d] /= n_grid;
         }
         vertex_map.emplace_back(v);
     }

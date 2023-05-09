@@ -124,7 +124,7 @@ static void show_cut_mesh() {
     // Draw grid + all lines in the canvas
     draw_list->PushClipRect(canvas_p0, canvas_p1, true);
     if (opt_enable_grid) {
-        const float grid_step = canvas_width / static_cast<float>(n_grid);
+        const float grid_step = canvas_width / n_grid;
         for (int i = 1; i < n_grid; ++i) {
             draw_list->AddLine(
                 ImVec2(canvas_p0.x + grid_step * static_cast<float>(i),
