@@ -23,7 +23,7 @@ jobs:
           submodules: recursive
           
     - name: Install packages
-      run: sudo apt install -y libgl-dev
+      run: sudo apt install -y libgl-dev libxrandr-dev
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
