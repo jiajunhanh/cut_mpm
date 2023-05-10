@@ -206,5 +206,19 @@ construct_cut_mesh(const std::vector<std::array<float, 2>> &vertices,
         }
     }
 
+    for (auto half_edge = cut_mesh.half_edges.begin();
+         half_edge != cut_mesh.half_edges.end(); ++half_edge) {
+        if (half_edge->face != cut_mesh.faces.end()) {
+            continue;
+        }
+        auto f = cut_mesh.emplace_face();
+        f->half_edge = half_edge;
+        auto h = half_edge;
+        do {
+            h->face = f;
+            h = h->next;
+        } while (h != half_edge);
+    }
+
     return cut_mesh;
 }
