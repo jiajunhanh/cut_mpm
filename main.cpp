@@ -3,12 +3,15 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "mpm.h"
+#include "mpm_config.h"
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cmath>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <iostream>
+#include <memory>
 #include <vector>
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)

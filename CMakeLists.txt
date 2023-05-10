@@ -7,6 +7,7 @@ add_executable(mandoline2d
         ${PROJECT_SOURCE_DIR}/main.cpp
         ${PROJECT_SOURCE_DIR}/half_edge.cpp
         ${PROJECT_SOURCE_DIR}/cut_mesh.cpp
+        ${PROJECT_SOURCE_DIR}/mpm.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_demo.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_draw.cpp

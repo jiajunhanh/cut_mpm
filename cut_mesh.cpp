@@ -1,8 +1,8 @@
 #include "cut_mesh.h"
 #include <algorithm>
 #include <cmath>
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+
+constexpr static int n_grid_nodes = (n_grid + 1) * (n_grid + 1);
 
 static auto lerp(Vertex &v, const Vertex &vi, const Vertex &vj, float t,
                  int d) {
@@ -60,7 +60,7 @@ static void add_grid_edges(std::vector<Vertex> &cut_vertices,
     }
 }
 
-std::pair<std::vector<Vertex>, std::vector<Edge>>
+static std::pair<std::vector<Vertex>, std::vector<Edge>>
 compute_cut_vertices_and_edges(
     const std::vector<std::array<float, 2>> &vertices,
     const std::vector<std::array<size_t, 2>> &edges) {

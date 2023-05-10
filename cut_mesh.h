@@ -1,12 +1,9 @@
 #pragma once
 
 #include "half_edge.h"
+#include "mpm_config.h"
 #include <iostream>
 #include <vector>
-
-constexpr int n_grid = 8;
-constexpr int n_grid_nodes = (n_grid + 1) * (n_grid + 1);
-constexpr float dx = 1.0f / n_grid;
 
 class Vertex {
   public:

@@ -1,4 +1,5 @@
 #include "half_edge.h"
+
 HalfEdgeMesh::HalfEdgeRef HalfEdgeMesh::emplace_half_edge() {
     HalfEdgeRef h;
     if (recycled_half_edges.empty()) {
