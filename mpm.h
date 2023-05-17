@@ -7,6 +7,7 @@
 #include <vector>
 
 class MPM {
+  public:
     using Vector = Eigen::Vector2f;
     using Vectori = Eigen::Vector2i;
     using Matrix = Eigen::Matrix2f;
@@ -27,9 +28,8 @@ class MPM {
 
     std::shared_ptr<HalfEdgeMesh> cut_mesh;
     std::vector<Particle> particles;
-    std::vector<Grid> grid;
+    std::vector<Grid> grids;
 
-  public:
     explicit MPM(const std::shared_ptr<HalfEdgeMesh> &cut_mesh_);
     void initialize();
     void update();

@@ -1,6 +1,6 @@
 #pragma once
 
-constexpr int quality = 16;
+constexpr int quality = 4;
 constexpr int n_grid = 8 * quality;
 constexpr int n_particles = 32 * quality * quality;
 constexpr float dt = 2e-3 / quality;

@@ -40,26 +40,27 @@ static void show_cut_mesh() {
 
     static std::vector<std::array<float, 2>> vertices;
     static std::vector<std::array<size_t, 2>> edges;
-    static HalfEdgeMesh cut_mesh;
+    static auto cut_mesh =
+        std::make_shared<HalfEdgeMesh>(construct_cut_mesh(vertices, edges));
+    static MPM mpm(cut_mesh);
     static bool opt_enable_grid = true;
     static bool opt_construct_cut_mesh = false;
-    static bool opt_draw_cut_vertices = true;
+    static bool opt_draw_cut_vertices = false;
     static bool opt_draw_cut_edges = false;
     static bool opt_draw_original_lines = true;
+    static bool opt_simulation = false;
     static bool adding_line = false;
-    static auto selected_half_edge = cut_mesh.half_edges.end();
+    static bool simulating = false;
+    static auto selected_half_edge = cut_mesh->half_edges.end();
 
     ImGui::Checkbox("Enable grid", &opt_enable_grid);
     ImGui::Checkbox("Construct cut-mesh", &opt_construct_cut_mesh);
     ImGui::Checkbox("Draw cut-vertices", &opt_draw_cut_vertices);
     ImGui::Checkbox("Draw cut-edges", &opt_draw_cut_edges);
     ImGui::Checkbox("Draw original lines", &opt_draw_original_lines);
-    if (ImGui::Button("Clear cut-mesh")) {
-        cut_mesh = HalfEdgeMesh();
-        selected_half_edge = cut_mesh.half_edges.end();
-    }
+
     if (!opt_construct_cut_mesh &&
-        selected_half_edge != cut_mesh.half_edges.end()) {
+        selected_half_edge != cut_mesh->half_edges.end()) {
         ImGui::SameLine();
         if (ImGui::Button("Next")) {
             selected_half_edge = selected_half_edge->next;
@@ -68,6 +69,15 @@ static void show_cut_mesh() {
         if (ImGui::Button("Twin")) {
             selected_half_edge = selected_half_edge->twin;
         }
+    }
+    if (!opt_construct_cut_mesh) {
+        ImGui::Checkbox("Simulation", &opt_simulation);
+    } else {
+        opt_simulation = false;
+    }
+    if (ImGui::Button("Clear cut-mesh")) {
+        *cut_mesh = HalfEdgeMesh();
+        selected_half_edge = cut_mesh->half_edges.end();
     }
     ImGui::Text(
         "Mouse Left: drag to add lines,\nMouse Right: click for context menu.");
@@ -144,8 +154,8 @@ static void show_cut_mesh() {
             auto j = (i + 1) % vertices.size();
             edges.emplace_back(std::array{i, j});
         }
-        cut_mesh = construct_cut_mesh(vertices, edges);
-        selected_half_edge = cut_mesh.half_edges.begin();
+        *cut_mesh = construct_cut_mesh(vertices, edges);
+        selected_half_edge = cut_mesh->half_edges.begin();
     }
 
     // Draw grid + all lines in the canvas
@@ -187,7 +197,7 @@ static void show_cut_mesh() {
         }
     }
     if (opt_draw_cut_edges) {
-        for (const auto &e : cut_mesh.edges) {
+        for (const auto &e : cut_mesh->edges) {
             const auto &v0 = e.half_edge->vertex;
             const auto &v1 = e.half_edge->twin->vertex;
             /*if (v0->id < n_grid_nodes && v1->id < n_grid_nodes) {
@@ -201,7 +211,7 @@ static void show_cut_mesh() {
         }
     }
     if (!opt_construct_cut_mesh &&
-        selected_half_edge != cut_mesh.half_edges.end()) {
+        selected_half_edge != cut_mesh->half_edges.end()) {
         std::vector<ImVec2> points;
         auto h = selected_half_edge;
         do {
@@ -222,12 +232,30 @@ static void show_cut_mesh() {
                            IM_COL32(0, 0, 255, 255), 4.0f);
     }
     if (opt_draw_cut_vertices) {
-        for (const auto &v : cut_mesh.vertices) {
+        for (const auto &v : cut_mesh->vertices) {
             draw_list->AddCircleFilled(
                 ImVec2(origin.x + v.position.x() * canvas_width,
                        origin.y + v.position.y() * canvas_width),
                 4, IM_COL32(255, 0, 0, 255));
         }
+    }
+    if (opt_simulation) {
+        if (!simulating) {
+            mpm = MPM(cut_mesh);
+            mpm.initialize();
+            simulating = true;
+        }
+        for (int i = 0; i < 30; ++i) {
+            mpm.update();
+        }
+        for (const auto &p : mpm.particles) {
+            draw_list->AddCircleFilled(
+                ImVec2(origin.x + p.position.x() * canvas_width,
+                       origin.y + p.position.y() * canvas_width),
+                2, IM_COL32(6, 133, 135, 255));
+        }
+    } else {
+        simulating = false;
     }
     draw_list->PopClipRect();
     ImGui::End();
