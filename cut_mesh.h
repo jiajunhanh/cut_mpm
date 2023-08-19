@@ -1,12 +1,13 @@
 #pragma once
 
-#include "half_edge.h"
-#include "mpm_config.h"
 #include <iostream>
 #include <vector>
 
+#include "half_edge.h"
+#include "mpm_config.h"
+
 class Vertex {
-  public:
+   public:
     int c[2];
     float q[2];
     bool b[2];
@@ -19,11 +20,11 @@ class Vertex {
 };
 
 class Edge {
-  public:
-    size_t i{}; // point id
-    size_t j{}; // point id
+   public:
+    size_t i{};  // point id
+    size_t j{};  // point id
 };
 
-HalfEdgeMesh
-construct_cut_mesh(const std::vector<std::array<float, 2>> &vertices,
-                   const std::vector<std::array<size_t, 2>> &edges);
+HalfEdgeMesh construct_cut_mesh(
+    const std::vector<std::array<float, 2>> &vertices,
+    const std::vector<std::array<size_t, 2>> &edges);

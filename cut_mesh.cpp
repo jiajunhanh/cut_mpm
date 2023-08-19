@@ -1,4 +1,5 @@
 #include "cut_mesh.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -143,9 +144,9 @@ compute_cut_vertices_and_edges(
     return {cut_vertices, cut_edges};
 }
 
-HalfEdgeMesh
-construct_cut_mesh(const std::vector<std::array<float, 2>> &vertices,
-                   const std::vector<std::array<size_t, 2>> &edges) {
+HalfEdgeMesh construct_cut_mesh(
+    const std::vector<std::array<float, 2>> &vertices,
+    const std::vector<std::array<size_t, 2>> &edges) {
     auto [cut_vertices, cut_edges] =
         compute_cut_vertices_and_edges(vertices, edges);
 

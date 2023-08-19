@@ -1,13 +1,14 @@
 #pragma once
 
-#include "cut_mesh.h"
-#include "mpm_config.h"
 #include <Eigen/Dense>
 #include <memory>
 #include <vector>
 
+#include "cut_mesh.h"
+#include "mpm_config.h"
+
 class MPM {
-  public:
+   public:
     using Vector = Eigen::Vector2f;
     using Vectori = Eigen::Vector2i;
     using Matrix = Eigen::Matrix2f;

@@ -9,7 +9,7 @@
 class HalfEdgeMesh {
     size_t next_id{};
 
-  public:
+   public:
     class HalfEdge;
     class Vertex;
     class Edge;
@@ -21,7 +21,7 @@ class HalfEdgeMesh {
     using FaceRef = std::list<Face>::iterator;
 
     class HalfEdge {
-      public:
+       public:
         HalfEdgeRef twin;
         HalfEdgeRef next;
         EdgeRef edge;
@@ -41,20 +41,20 @@ class HalfEdgeMesh {
     };
 
     class Edge {
-      public:
+       public:
         HalfEdgeRef half_edge;
         size_t id{};
     };
 
     class Vertex {
-      public:
+       public:
         HalfEdgeRef half_edge;
         size_t id{};
         Eigen::Vector2f position{};
     };
 
     class Face {
-      public:
+       public:
         HalfEdgeRef half_edge;
         size_t id{};
     };
@@ -64,13 +64,13 @@ class HalfEdgeMesh {
     std::list<Edge> edges;
     std::list<Face> faces;
 
-  private:
+   private:
     std::stack<HalfEdgeRef> recycled_half_edges;
     std::stack<VertexRef> recycled_vertices;
     std::stack<EdgeRef> recycled_edges;
     std::stack<FaceRef> recycled_faces;
 
-  public:
+   public:
     HalfEdgeRef emplace_half_edge();
     VertexRef emplace_vertex();
     EdgeRef emplace_edge();

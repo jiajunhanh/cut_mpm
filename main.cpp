@@ -1,3 +1,13 @@
+#include <GLFW/glfw3.h>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <memory>
+#include <vector>
+
 #include "cut_mesh.h"
 #include "half_edge.h"
 #include "imgui.h"
@@ -5,19 +15,11 @@
 #include "imgui_impl_opengl3.h"
 #include "mpm.h"
 #include "mpm_config.h"
-#include <GLFW/glfw3.h>
-#include <algorithm>
-#include <cmath>
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-#include <iostream>
-#include <memory>
-#include <vector>
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
 #endif
-#if defined(_MSC_VER) && (_MSC_VER >= 1900) &&                                 \
+#if defined(_MSC_VER) && (_MSC_VER >= 1900) && \
     !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
 #pragma comment(lib, "legacy_stdio_definitions")
 #endif
@@ -85,7 +87,7 @@ static void show_cut_mesh() {
     // Using InvisibleButton() as a convenience 1) it will advance the layout
     // cursor and 2) allows us to use IsItemHovered()/IsItemActive()
     ImVec2 canvas_p0 =
-        ImGui::GetCursorScreenPos(); // ImDrawList API uses screen coordinates!
+        ImGui::GetCursorScreenPos();  // ImDrawList API uses screen coordinates!
     ImVec2 canvas_sz(canvas_width, canvas_width);
     ImVec2 canvas_p1 =
         ImVec2(canvas_p0.x + canvas_sz.x, canvas_p0.y + canvas_sz.y);
@@ -97,11 +99,11 @@ static void show_cut_mesh() {
                              IM_COL32(200, 200, 200, 255));
 
     // This will catch our interactions
-    ImGui::InvisibleButton("canvas", canvas_sz,
-                           ImGuiButtonFlags_MouseButtonLeft |
-                               ImGuiButtonFlags_MouseButtonRight);
-    const bool is_hovered = ImGui::IsItemHovered(); // Hovered
-    const ImVec2 origin(canvas_p0.x, canvas_p0.y);  // Lock scrolled origin
+    ImGui::InvisibleButton(
+        "canvas", canvas_sz,
+        ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+    const bool is_hovered = ImGui::IsItemHovered();  // Hovered
+    const ImVec2 origin(canvas_p0.x, canvas_p0.y);   // Lock scrolled origin
     const ImVec2 mouse_pos_in_canvas(io.MousePos.x - origin.x,
                                      io.MousePos.y - origin.y);
 
@@ -119,15 +121,13 @@ static void show_cut_mesh() {
     if (adding_line) {
         vertices.back() = std::array{mouse_pos_in_canvas.x / canvas_width,
                                      mouse_pos_in_canvas.y / canvas_width};
-        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
-            adding_line = false;
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) adding_line = false;
     }
 
     // Context menu (under default mouse threshold)
     ImGui::OpenPopupOnItemClick("context", ImGuiPopupFlags_MouseButtonRight);
     if (ImGui::BeginPopup("context")) {
-        if (adding_line)
-            vertices.resize(vertices.size() - 1);
+        if (adding_line) vertices.resize(vertices.size() - 1);
         adding_line = false;
         if (ImGui::MenuItem("Remove one", nullptr, false, !vertices.empty())) {
             vertices.resize(vertices.size() - 1);
@@ -263,8 +263,7 @@ static void show_cut_mesh() {
 
 int main() {
     glfwSetErrorCallback(glfw_error_callback);
-    if (!glfwInit())
-        return 1;
+    if (!glfwInit()) return 1;
 
         // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -278,8 +277,8 @@ int main() {
     const char *glsl_version = "#version 150";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // 3.2+ only
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);           // Required on Mac
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);  // Required on Mac
 #else
     // GL 3.0 + GLSL 130
     const char *glsl_version = "#version 130";
@@ -292,10 +291,9 @@ int main() {
     // Create window with graphics context
     GLFWwindow *window = glfwCreateWindow(
         1280, 720, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
-    if (window == nullptr)
-        return 1;
+    if (window == nullptr) return 1;
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
+    glfwSwapInterval(1);  // Enable vsync
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -303,9 +301,9 @@ int main() {
     ImGuiIO &io = ImGui::GetIO();
     (void)io;
     io.ConfigFlags |=
-        ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+        ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
     io.ConfigFlags |=
-        ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
+        ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
     // io.IniFilename = nullptr;
 
     // Setup Dear ImGui style
