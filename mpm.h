@@ -17,8 +17,7 @@ class MPM {
         Vector position;
         Vector velocity;
         Matrix deformation_gradient = Matrix::Identity();
-        float deformation_jacobian = 1.0f;
-        Matrix affine_matrix = Matrix::Identity();
+        Matrix affine_matrix;
     };
 
     struct GridNode {

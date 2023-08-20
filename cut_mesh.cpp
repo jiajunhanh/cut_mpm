@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-constexpr static int kNumberOfGridNodes = (kGridSize + 1) * (kGridSize + 1);
+constexpr static int kGridNodesNumber = (kGridSize + 1) * (kGridSize + 1);
 
 static void lerp(Vertex &v, const Vertex &vi, const Vertex &vj, float t,
                  int d) {
@@ -18,8 +18,7 @@ static void lerp(Vertex &v, const Vertex &vi, const Vertex &vj, float t,
 static void add_grid_edges(std::vector<Vertex> &cut_vertices,
                            std::vector<Edge> &cut_edges) {
     std::vector<int> grid_cut_vertices[kGridSize * kGridSize][2];
-    for (int i = kNumberOfGridNodes,
-             size = static_cast<int>(cut_vertices.size());
+    for (int i = kGridNodesNumber, size = static_cast<int>(cut_vertices.size());
          i < size; ++i) {
         const auto &v = cut_vertices[i];
         for (int d = 0; d < 2; ++d) {
@@ -86,8 +85,8 @@ compute_cut_vertices_and_edges(
     }
     for (const auto &e : edges) {
         std::vector<std::pair<float, int>> intersection_points;
-        const auto vi = cut_vertices[e[0] + kNumberOfGridNodes];
-        const auto vj = cut_vertices[e[1] + kNumberOfGridNodes];
+        const auto vi = cut_vertices[e[0] + kGridNodesNumber];
+        const auto vj = cut_vertices[e[1] + kGridNodesNumber];
         for (int d = 0; d < 2; ++d) {
             int z_min;
             int z_max;
@@ -121,11 +120,11 @@ compute_cut_vertices_and_edges(
             begin(intersection_points), end(intersection_points),
             [](const auto &a, const auto &b) { return a.first < b.first; });
         if (intersection_points.empty()) {
-            cut_edges.emplace_back(e[0] + kNumberOfGridNodes,
-                                   e[1] + kNumberOfGridNodes);
+            cut_edges.emplace_back(e[0] + kGridNodesNumber,
+                                   e[1] + kGridNodesNumber);
             continue;
         }
-        cut_edges.emplace_back(e[0] + kNumberOfGridNodes,
+        cut_edges.emplace_back(e[0] + kGridNodesNumber,
                                intersection_points.front().second);
         for (int i = 0, size = static_cast<int>(intersection_points.size());
              i + 1 < size; ++i) {
@@ -137,7 +136,7 @@ compute_cut_vertices_and_edges(
                                    intersection_points[i + 1].second);
         }
         cut_edges.emplace_back(intersection_points.back().second,
-                               e[1] + kNumberOfGridNodes);
+                               e[1] + kGridNodesNumber);
     }
     add_grid_edges(cut_vertices, cut_edges);
     return {cut_vertices, cut_edges};

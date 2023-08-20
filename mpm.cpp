@@ -23,20 +23,20 @@ static float random_float() {
 
 MPM::MPM(const std::shared_ptr<HalfEdgeMesh> &cut_mesh_)
     : cut_mesh_(cut_mesh_) {
-    grid_nodes_.resize(cut_mesh_->vertices().size());
-    for (auto [i, v] =
-             std::tuple{static_cast<size_t>(0), cut_mesh_->vertices().begin()};
-         i < grid_nodes_.size() && v != cut_mesh_->vertices().end(); ++i, ++v) {
+    int n_vertices = static_cast<int>(cut_mesh_->vertices().size());
+    grid_nodes_.resize(n_vertices);
+    for (auto [i, v] = std::tuple(0, begin(cut_mesh_->vertices()));
+         i < n_vertices; ++i, ++v) {
         grid_nodes_[i].vertex = v;
     }
 }
 
 void MPM::initialize() {
     particles_.clear();
-    particles_.resize(kNumberOfParticles);
+    particles_.resize(kParticleNumber);
     for (auto &p : particles_) {
-        p.position.x() = random_float() * 0.4f + 0.2f;
-        p.position.y() = random_float() * 0.4f + 0.2f;
+        p.position.x() = random_float() * 0.35f + 0.2f;
+        p.position.y() = random_float() * 0.35f + 0.2f;
     }
 }
 
@@ -55,30 +55,20 @@ void MPM::update() {
         p.deformation_gradient =
             (Matrix::Identity() + kDeltaT * p.affine_matrix) *
             p.deformation_gradient;
-        auto hardening_coefficient =
-            std::exp(10.0f * (1.0f - p.deformation_jacobian));
-        hardening_coefficient = 0.3f;
+        /*auto hardening_coefficient =
+            std::exp(10.0f * (1.0f - p.deformation_jacobian));*/
+        auto hardening_coefficient = 0.5f;
         auto mu = kMu0 * hardening_coefficient;
         auto lambda = kLambda0 * hardening_coefficient;
-        // mu = 0.0f;
-        Eigen::JacobiSVD<Matrix, Eigen::ComputeThinU | Eigen::ComputeThinV> svd(
+        Eigen::JacobiSVD<Matrix, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(
             p.deformation_gradient);
-        Vector sig = svd.singularValues();
-        float plastic_deformation = 1.0f;
-        for (int d = 0; d < 2; ++d) {
-            auto new_sig = sig[d];
-            p.deformation_jacobian *= sig[d] / new_sig;
-            sig[d] = new_sig;
-            plastic_deformation *= new_sig;
-        }
-        // p.deformation_gradient =
-        //     Matrix::Identity() * std::sqrt(plastic_deformation);
+        float deformation_determinant = p.deformation_gradient.determinant();
         Matrix stress = 2.0f * mu *
                             (p.deformation_gradient -
                              svd.matrixU() * svd.matrixV().transpose()) *
                             p.deformation_gradient.transpose() +
-                        Matrix::Identity() * lambda * plastic_deformation *
-                            (plastic_deformation - 1.0f);
+                        Matrix::Identity() * lambda * deformation_determinant *
+                            (deformation_determinant - 1.0f);
         stress = (-kDeltaT * kParticleVolume * 4.0f * kInvDeltaX * kInvDeltaX) *
                  stress;
         Matrix affine = stress + kParticleMass * p.affine_matrix;
@@ -88,7 +78,8 @@ void MPM::update() {
                 Vector distance = (offset.cast<float>() - fx) * kDeltaX;
                 auto weight = weights[i][0] * weights[j][1];
                 Vectori grid_idx = base + offset;
-                auto &g = grid_nodes_[grid_idx[0] * kGridSize + grid_idx[1]];
+                auto &g =
+                    grid_nodes_[grid_idx[1] * (kGridSize + 1) + grid_idx[0]];
                 g.velocity +=
                     weight * (kParticleMass * p.velocity + affine * distance);
                 g.mass += weight * kParticleMass;
@@ -98,8 +89,8 @@ void MPM::update() {
     // Grid update
     for (auto &g : grid_nodes_) {
         auto id = g.vertex->id;
-        auto x = id / kGridSize;
-        auto y = id % kGridSize;
+        auto x = id % (kGridSize + 1);
+        auto y = id / (kGridSize + 1);
         if (g.mass <= 0.0f) {
             continue;
         }
@@ -126,22 +117,22 @@ void MPM::update() {
                              0.75f - (fx.array() - 1.0f).square(),
                              0.5f * (fx.array() - 0.5f).square()};
         Vector new_velocity = Vector::Zero();
-        Matrix new_affine_velocity = Matrix::Zero();
+        Matrix new_affine_matrix = Matrix::Zero();
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
                 auto offset = Vectori(i, j);
                 Vector distance = offset.cast<float>() - fx;
                 Vectori grid_idx = base + offset;
                 const auto &g =
-                    grid_nodes_[grid_idx[0] * kGridSize + grid_idx[1]];
+                    grid_nodes_[grid_idx[1] * (kGridSize + 1) + grid_idx[0]];
                 auto weight = weights[i][0] * weights[j][1];
                 new_velocity += weight * g.velocity;
-                new_affine_velocity += 4.0f * kInvDeltaX * weight * g.velocity *
-                                       distance.transpose();
+                new_affine_matrix += 4.0f * kInvDeltaX * weight *
+                                     (g.velocity * distance.transpose());
             }
-            p.velocity = new_velocity;
-            p.affine_matrix = new_affine_velocity;
-            p.position += kDeltaT * p.velocity;
         }
+        p.velocity = new_velocity;
+        p.affine_matrix = new_affine_matrix;
+        p.position += kDeltaT * p.velocity;
     }
 }
