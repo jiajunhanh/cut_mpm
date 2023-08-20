@@ -41,7 +41,7 @@ static void show_cut_mesh() {
     }
 
     static std::vector<std::array<float, 2>> vertices;
-    static std::vector<std::array<size_t, 2>> edges;
+    static std::vector<std::array<int, 2>> edges;
     static auto cut_mesh =
         std::make_shared<HalfEdgeMesh>(construct_cut_mesh(vertices, edges));
     static MPM mpm(cut_mesh);
@@ -53,7 +53,7 @@ static void show_cut_mesh() {
     static bool opt_simulation = false;
     static bool adding_line = false;
     static bool simulating = false;
-    static auto selected_half_edge = cut_mesh->half_edges.end();
+    static auto selected_half_edge = cut_mesh->half_edges().end();
 
     ImGui::Checkbox("Enable grid", &opt_enable_grid);
     ImGui::Checkbox("Construct cut-mesh", &opt_construct_cut_mesh);
@@ -62,7 +62,7 @@ static void show_cut_mesh() {
     ImGui::Checkbox("Draw original lines", &opt_draw_original_lines);
 
     if (!opt_construct_cut_mesh &&
-        selected_half_edge != cut_mesh->half_edges.end()) {
+        selected_half_edge != cut_mesh->half_edges().end()) {
         ImGui::SameLine();
         if (ImGui::Button("Next")) {
             selected_half_edge = selected_half_edge->next;
@@ -79,7 +79,7 @@ static void show_cut_mesh() {
     }
     if (ImGui::Button("Clear cut-mesh")) {
         *cut_mesh = HalfEdgeMesh();
-        selected_half_edge = cut_mesh->half_edges.end();
+        selected_half_edge = cut_mesh->half_edges().end();
     }
     ImGui::Text(
         "Mouse Left: drag to add lines,\nMouse Right: click for context menu.");
@@ -150,19 +150,20 @@ static void show_cut_mesh() {
     }
     if (opt_construct_cut_mesh) {
         edges.clear();
-        for (size_t i = 0; i < vertices.size(); ++i) {
-            auto j = (i + 1) % vertices.size();
+        for (int i = 0, size = static_cast<int>(vertices.size()); i < size;
+             ++i) {
+            auto j = (i + 1) % size;
             edges.emplace_back(std::array{i, j});
         }
         *cut_mesh = construct_cut_mesh(vertices, edges);
-        selected_half_edge = cut_mesh->half_edges.begin();
+        selected_half_edge = cut_mesh->half_edges().begin();
     }
 
     // Draw grid + all lines in the canvas
     draw_list->PushClipRect(canvas_p0, canvas_p1, true);
     if (opt_enable_grid) {
-        const float grid_step = canvas_width / n_grid;
-        for (int i = 1; i < n_grid; ++i) {
+        const float grid_step = canvas_width / kGridSize;
+        for (int i = 1; i < kGridSize; ++i) {
             draw_list->AddLine(
                 ImVec2(canvas_p0.x + grid_step * static_cast<float>(i),
                        canvas_p0.y),
@@ -197,7 +198,7 @@ static void show_cut_mesh() {
         }
     }
     if (opt_draw_cut_edges) {
-        for (const auto &e : cut_mesh->edges) {
+        for (const auto &e : cut_mesh->edges()) {
             const auto &v0 = e.half_edge->vertex;
             const auto &v1 = e.half_edge->twin->vertex;
             /*if (v0->id < n_grid_nodes && v1->id < n_grid_nodes) {
@@ -211,7 +212,7 @@ static void show_cut_mesh() {
         }
     }
     if (!opt_construct_cut_mesh &&
-        selected_half_edge != cut_mesh->half_edges.end()) {
+        selected_half_edge != cut_mesh->half_edges().end()) {
         std::vector<ImVec2> points;
         auto h = selected_half_edge;
         do {
@@ -232,7 +233,7 @@ static void show_cut_mesh() {
                            IM_COL32(0, 0, 255, 255), 4.0f);
     }
     if (opt_draw_cut_vertices) {
-        for (const auto &v : cut_mesh->vertices) {
+        for (const auto &v : cut_mesh->vertices()) {
             draw_list->AddCircleFilled(
                 ImVec2(origin.x + v.position.x() * canvas_width,
                        origin.y + v.position.y() * canvas_width),
@@ -248,7 +249,7 @@ static void show_cut_mesh() {
         for (int i = 0; i < 30; ++i) {
             mpm.update();
         }
-        for (const auto &p : mpm.particles) {
+        for (const auto &p : mpm.particles()) {
             draw_list->AddCircleFilled(
                 ImVec2(origin.x + p.position.x() * canvas_width,
                        origin.y + p.position.y() * canvas_width),

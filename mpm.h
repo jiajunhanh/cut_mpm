@@ -14,24 +14,28 @@ class MPM {
     using Matrix = Eigen::Matrix2f;
 
     struct Particle {
-        Vector position{};
-        Vector velocity{};
+        Vector position;
+        Vector velocity;
         Matrix deformation_gradient = Matrix::Identity();
-        Matrix affine_velocity = Matrix::Identity();
-        float plastic_deformation = 1.0f;
+        float deformation_jacobian = 1.0f;
+        Matrix affine_matrix = Matrix::Identity();
     };
 
-    struct Grid {
+    struct GridNode {
         float mass = 0.0f;
-        Vector velocity{};
-        HalfEdgeMesh::VertexRef vertex{};
+        Vector velocity;
+        HalfEdgeMesh::VertexRef vertex;
     };
 
-    std::shared_ptr<HalfEdgeMesh> cut_mesh;
-    std::vector<Particle> particles;
-    std::vector<Grid> grids;
-
-    explicit MPM(const std::shared_ptr<HalfEdgeMesh> &cut_mesh_);
+    explicit MPM(const std::shared_ptr<HalfEdgeMesh>& cut_mesh_);
     void initialize();
     void update();
+    [[nodiscard]] const std::vector<Particle>& particles() const {
+        return particles_;
+    }
+
+   private:
+    std::shared_ptr<HalfEdgeMesh> cut_mesh_;
+    std::vector<Particle> particles_;
+    std::vector<GridNode> grid_nodes_;
 };

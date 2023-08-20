@@ -1,8 +1,8 @@
 #pragma once
 
-constexpr int quality = 4;
-constexpr int n_grid = 8 * quality;
-constexpr int n_particles = 32 * quality * quality;
-constexpr float dt = 2e-3 / quality;
-constexpr float dx = 1.0f / n_grid;
-constexpr float inv_dx = n_grid;
+constexpr int kQuality = 1;
+constexpr int kGridSize = 8 * kQuality;
+constexpr int kNumberOfParticles = 32 * kQuality * kQuality;
+constexpr float kDeltaT = 2e-3f / kQuality;
+constexpr float kDeltaX = 1.0f / kGridSize;
+constexpr float kInvDeltaX = kGridSize;
