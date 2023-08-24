@@ -21,6 +21,13 @@ static float random_float() {
     return dis(gen);
 }
 
+static float interpolate(float x) {
+    x = std::abs(x);
+    if (x < 0.5f) return 0.75f - x * x;
+    if (x < 1.5f) return 0.5f * (1.5f - x) * (1.5f - x);
+    return 0.0f;
+}
+
 static auto svd(const MPM::Mat2 &m) {
     Eigen::JacobiSVD<MPM::Mat2, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(
         m);
@@ -40,28 +47,25 @@ MPM::MPM(const std::shared_ptr<HalfEdgeMesh> &cut_mesh_)
 void MPM::initialize() {
     particles_.clear();
     particles_.resize(kParticleNumber);
-    for (auto &p : particles_) {
+    for (Particle &p : particles_) {
         p.x.x() = random_float() * 0.35f + 0.2f;
         p.x.y() = random_float() * 0.35f + 0.2f;
     }
 }
 
 void MPM::update() {
-    for (auto &g : grid_nodes_) {
+    for (GridNode &g : grid_nodes_) {
         g.m = 0.0f;
         g.v.setZero();
     }
     // P2G
-    for (auto &p : particles_) {
+    for (Particle &p : particles_) {
         Vec2i base = ((p.x * kInvDeltaX).array() - 0.5f).cast<int>();
         Vec2 fx = p.x * kInvDeltaX - base.cast<float>();
-        Vec2 weights[3] = {0.5f * (1.5f - fx.array()).square(),
-                           0.75f - (fx.array() - 1.0f).square(),
-                           0.5f * (fx.array() - 0.5f).square()};
         p.F = (Mat2::Identity() + kDeltaT * p.C) * p.F;
-        auto hardening_coefficient = 0.5f;
-        auto mu = kMu0 * hardening_coefficient;
-        auto lambda = kLambda0 * hardening_coefficient;
+        float hardening_coefficient = 0.5f;
+        float mu = kMu0 * hardening_coefficient;
+        float lambda = kLambda0 * hardening_coefficient;
         auto [U, sig, V] = svd(p.F);
         float J = p.F.determinant();
         Mat2 PF = 2.0f * mu * (p.F - U * V.transpose()) * p.F.transpose() +
@@ -76,13 +80,14 @@ void MPM::update() {
         Mat2 affine = kParticleMass * p.C;
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                auto offset = Vec2i(i, j);
+                Vec2i offset(i, j);
                 Vec2 distance = (offset.cast<float>() - fx);
-                auto weight = weights[i][0] * weights[j][1];
+                float weight =
+                    interpolate(distance.x()) * interpolate(distance.y());
                 distance *= kDeltaX;
                 int x = base.x() + i;
                 int y = base.y() + j;
-                auto &g = grid_nodes_[y * (kGridSize + 1) + x];
+                GridNode &g = grid_nodes_[y * (kGridSize + 1) + x];
                 g.v += weight * (kParticleMass * p.v + affine * distance);
                 g.v += weight * stress * Vec3(1.0f, distance.x(), distance.y());
                 g.m += weight * kParticleMass;
@@ -90,46 +95,35 @@ void MPM::update() {
         }
     }
     // Grid update
-    for (auto &g : grid_nodes_) {
-        auto id = g.vertex->id;
-        auto x = id % (kGridSize + 1);
-        auto y = id / (kGridSize + 1);
-        if (g.m <= 0.0f) {
-            continue;
-        }
+    for (GridNode &g : grid_nodes_) {
+        int id = g.vertex->id;
+        int x = id % (kGridSize + 1);
+        int y = id / (kGridSize + 1);
+        if (g.m <= 0.0f) continue;
         g.v /= g.m;
         g.v += kDeltaT * kGravity * 30.0f;
-        if (x < 3 && g.v[0] < 0.0f) {
-            g.v[0] = 0.0f;
-        }
-        if (x > kGridSize - 3 && g.v[0] > 0.0f) {
-            g.v[0] = 0.0f;
-        }
-        if (y < 3 && g.v[1] < 0.0f) {
-            g.v[1] = 0.0f;
-        }
-        if (y > kGridSize - 3 && g.v[1] > 0.0f) {
-            g.v[1] = 0.0f;
-        }
+        if (x < 3 && g.v[0] < 0.0f) g.v[0] = 0.0f;
+        if (x > kGridSize - 3 && g.v[0] > 0.0f) g.v[0] = 0.0f;
+        if (y < 3 && g.v[1] < 0.0f) g.v[1] = 0.0f;
+        if (y > kGridSize - 3 && g.v[1] > 0.0f) g.v[1] = 0.0f;
     }
     // G2P
-    for (auto &p : particles_) {
+    for (Particle &p : particles_) {
         Vec2i base = ((p.x * kInvDeltaX).array() - 0.5f).cast<int>();
         Vec2 fx = p.x * kInvDeltaX - base.cast<float>();
-        Vec2 weights[3] = {0.5f * (1.5f - fx.array()).square(),
-                           0.75f - (fx.array() - 1.0f).square(),
-                           0.5f * (fx.array() - 0.5f).square()};
         Vec2 new_v = Vec2::Zero();
         Mat2 new_C = Mat2::Zero();
         Mat3 new_M = Mat3::Zero();
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                auto offset = Vec2i(i, j);
-                Vec2 distance = (offset.cast<float>() - fx) * kDeltaX;
+                Vec2i offset(i, j);
+                Vec2 distance = (offset.cast<float>() - fx);
+                float weight =
+                    interpolate(distance.x()) * interpolate(distance.y());
+                distance *= kDeltaX;
                 int x = base.x() + i;
                 int y = base.y() + j;
-                const auto &g = grid_nodes_[y * (kGridSize + 1) + x];
-                auto weight = weights[i][0] * weights[j][1];
+                const GridNode &g = grid_nodes_[y * (kGridSize + 1) + x];
                 new_v += weight * g.v;
                 new_C += weight * (g.v * distance.transpose());
                 Vec3 P(1.0f, distance.x(), distance.y());

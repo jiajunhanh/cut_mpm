@@ -7,9 +7,9 @@ constexpr static int kGridNodesNumber = (kGridSize + 1) * (kGridSize + 1);
 
 static void lerp(Vertex &v, const Vertex &vi, const Vertex &vj, float t,
                  int d) {
-    auto coord_i = vi.coord(d);
-    auto coord_j = vj.coord(d);
-    auto coord = coord_i + (coord_j - coord_i) * t;
+    float coord_i = vi.coord(d);
+    float coord_j = vj.coord(d);
+    float coord = coord_i + (coord_j - coord_i) * t;
     v.c[d] = static_cast<int>(std::floor(coord));
     v.q[d] = coord - std::floor(coord);
     v.b[d] = v.q[d] == 0.0f;
@@ -20,7 +20,7 @@ static void add_grid_edges(std::vector<Vertex> &cut_vertices,
     std::vector<int> grid_cut_vertices[kGridSize * kGridSize][2];
     for (int i = kGridNodesNumber, size = static_cast<int>(cut_vertices.size());
          i < size; ++i) {
-        const auto &v = cut_vertices[i];
+        const Vertex &v = cut_vertices[i];
         for (int d = 0; d < 2; ++d) {
             if (v.b[d]) {
                 grid_cut_vertices[v.c[1] * kGridSize + v.c[0]][d ^ 1]
@@ -30,7 +30,7 @@ static void add_grid_edges(std::vector<Vertex> &cut_vertices,
     }
     for (int y = 0; y < kGridSize; ++y) {
         for (int x = 0; x < kGridSize; ++x) {
-            auto node_i = y * (kGridSize + 1) + x;
+            int node_i = y * (kGridSize + 1) + x;
             for (int d = 0; d < 2; ++d) {
                 auto &v = grid_cut_vertices[y * kGridSize + x][d];
                 int node_j = node_i + d * kGridSize + 1;
@@ -76,7 +76,7 @@ compute_cut_vertices_and_edges(
     for (const auto &v : vertices) {
         Vertex cut_vertex;
         for (int d = 0; d < 2; ++d) {
-            auto x = v[d] * kGridSize;
+            float x = v[d] * kGridSize;
             cut_vertex.c[d] = static_cast<int>(std::floor(x));
             cut_vertex.q[d] = x - std::floor(x);
             cut_vertex.b[d] = (cut_vertex.q[d] == 0.0f);
@@ -85,8 +85,8 @@ compute_cut_vertices_and_edges(
     }
     for (const auto &e : edges) {
         std::vector<std::pair<float, int>> intersection_points;
-        const auto vi = cut_vertices[e[0] + kGridNodesNumber];
-        const auto vj = cut_vertices[e[1] + kGridNodesNumber];
+        const Vertex vi = cut_vertices[e[0] + kGridNodesNumber];
+        const Vertex vj = cut_vertices[e[1] + kGridNodesNumber];
         for (int d = 0; d < 2; ++d) {
             int z_min;
             int z_max;
@@ -98,10 +98,11 @@ compute_cut_vertices_and_edges(
                 z_min = vj.b[d] ? vj.c[d] : vj.c[d] + 1;
                 z_max = vi.c[d];
             }
-            auto distance =
+            float distance =
                 static_cast<float>(vj.c[d] - vi.c[d]) + (vj.q[d] - vi.q[d]);
             for (int z = z_min; z <= z_max; ++z) {
-                auto t = (static_cast<float>(z - vi.c[d]) - vi.q[d]) / distance;
+                float t =
+                    (static_cast<float>(z - vi.c[d]) - vi.q[d]) / distance;
                 Vertex cut_v;
                 lerp(cut_v, vi, vj, t, d ^ 1);
                 cut_v.c[d] = z;
@@ -154,7 +155,7 @@ HalfEdgeMesh construct_cut_mesh(
     mesh_vertices.reserve(cut_vertices.size());
     vertex_half_edges.resize(cut_vertices.size());
 
-    for (const auto &cut_vertex : cut_vertices) {
+    for (const Vertex &cut_vertex : cut_vertices) {
         auto v = cut_mesh.emplace_vertex();
         for (int d = 0; d < 2; ++d)
             v->position[d] =
@@ -163,7 +164,7 @@ HalfEdgeMesh construct_cut_mesh(
         mesh_vertices.emplace_back(v);
     }
 
-    for (const auto &cut_edge : cut_edges) {
+    for (const Edge &cut_edge : cut_edges) {
         auto h0 = cut_mesh.emplace_half_edge();
         auto h1 = cut_mesh.emplace_half_edge();
         auto v0 = mesh_vertices[cut_edge.i];
