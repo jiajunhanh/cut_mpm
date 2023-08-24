@@ -16,7 +16,7 @@ add_executable(mandoline2d
         ${PROJECT_SOURCE_DIR}/deps/imgui/backends/imgui_impl_glfw.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/backends/imgui_impl_opengl3.cpp
         ${PROJECT_SOURCE_DIR}/deps/glad/src/gl.c
-        )
+)
 
 target_include_directories(mandoline2d PRIVATE
         ${PROJECT_SOURCE_DIR}
@@ -24,7 +24,7 @@ target_include_directories(mandoline2d PRIVATE
         ${PROJECT_SOURCE_DIR}/deps/imgui
         ${PROJECT_SOURCE_DIR}/deps/imgui/backends
         ${PROJECT_SOURCE_DIR}/deps/glad/include
-        )
+)
 
 find_package(OpenGL REQUIRED)
 target_link_libraries(mandoline2d OpenGL::GL)
@@ -42,4 +42,4 @@ target_link_libraries(mandoline2d fmt::fmt)
 target_compile_options(mandoline2d PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/W3 /WX /wd4819>
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
-        )
+)

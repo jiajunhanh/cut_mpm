@@ -12,13 +12,19 @@ constexpr float kMu0 = kYoungModulus / (2.0f * (1.0f + kPoissonRatio));
 constexpr float kLambda0 =
     kYoungModulus * kPoissonRatio /
     ((1.0f + kPoissonRatio) * (1.0f - 2.0f * kPoissonRatio));
-const MPM::Vector kGravity(0.0f, 1.0f);
+const MPM::Vec2 kGravity(0.0f, 1.0f);
 
 static float random_float() {
     static std::random_device rd;
     static std::mt19937 gen(rd());
     static std::uniform_real_distribution<float> dis(0.0f, 1.0f);
     return dis(gen);
+}
+
+static auto svd(const MPM::Mat2 &m) {
+    Eigen::JacobiSVD<MPM::Mat2, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(
+        m);
+    return std::tuple{svd.matrixU(), svd.singularValues(), svd.matrixV()};
 }
 
 MPM::MPM(const std::shared_ptr<HalfEdgeMesh> &cut_mesh_)
@@ -35,54 +41,51 @@ void MPM::initialize() {
     particles_.clear();
     particles_.resize(kParticleNumber);
     for (auto &p : particles_) {
-        p.position.x() = random_float() * 0.35f + 0.2f;
-        p.position.y() = random_float() * 0.35f + 0.2f;
+        p.x.x() = random_float() * 0.35f + 0.2f;
+        p.x.y() = random_float() * 0.35f + 0.2f;
     }
 }
 
 void MPM::update() {
     for (auto &g : grid_nodes_) {
-        g.mass = 0.0f;
-        g.velocity.setZero();
+        g.m = 0.0f;
+        g.v.setZero();
     }
     // P2G
     for (auto &p : particles_) {
-        Vectori base = ((p.position * kInvDeltaX).array() - 0.5f).cast<int>();
-        Vector fx = p.position * kInvDeltaX - base.cast<float>();
-        Vector weights[3] = {0.5f * (1.5f - fx.array()).square(),
-                             0.75f - (fx.array() - 1.0f).square(),
-                             0.5f * (fx.array() - 0.5f).square()};
-        p.deformation_gradient =
-            (Matrix::Identity() + kDeltaT * p.affine_matrix) *
-            p.deformation_gradient;
-        /*auto hardening_coefficient =
-            std::exp(10.0f * (1.0f - p.deformation_jacobian));*/
+        Vec2i base = ((p.x * kInvDeltaX).array() - 0.5f).cast<int>();
+        Vec2 fx = p.x * kInvDeltaX - base.cast<float>();
+        Vec2 weights[3] = {0.5f * (1.5f - fx.array()).square(),
+                           0.75f - (fx.array() - 1.0f).square(),
+                           0.5f * (fx.array() - 0.5f).square()};
+        p.F = (Mat2::Identity() + kDeltaT * p.C) * p.F;
         auto hardening_coefficient = 0.5f;
         auto mu = kMu0 * hardening_coefficient;
         auto lambda = kLambda0 * hardening_coefficient;
-        Eigen::JacobiSVD<Matrix, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(
-            p.deformation_gradient);
-        float deformation_determinant = p.deformation_gradient.determinant();
-        Matrix stress = 2.0f * mu *
-                            (p.deformation_gradient -
-                             svd.matrixU() * svd.matrixV().transpose()) *
-                            p.deformation_gradient.transpose() +
-                        Matrix::Identity() * lambda * deformation_determinant *
-                            (deformation_determinant - 1.0f);
-        stress = (-kDeltaT * kParticleVolume * 4.0f * kInvDeltaX * kInvDeltaX) *
-                 stress;
-        Matrix affine = stress + kParticleMass * p.affine_matrix;
+        auto [U, sig, V] = svd(p.F);
+        float J = p.F.determinant();
+        Mat2 PF = 2.0f * mu * (p.F - U * V.transpose()) * p.F.transpose() +
+                  Mat2::Identity() * lambda * J * (J - 1.0f);
+        Mat3 M_inv = p.M_inv;
+        Mat23 stress = Mat23::Zero();
+        for (int i = 0; i < 2; ++i) {
+            for (int j = 0; j < 2; ++j)
+                stress.row(i) += M_inv.row(j + 1) * PF(i, j);
+        }
+        stress *= -kDeltaT * kParticleVolume;
+        Mat2 affine = kParticleMass * p.C;
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                auto offset = Vectori(i, j);
-                Vector distance = (offset.cast<float>() - fx) * kDeltaX;
+                auto offset = Vec2i(i, j);
+                Vec2 distance = (offset.cast<float>() - fx);
                 auto weight = weights[i][0] * weights[j][1];
-                Vectori grid_idx = base + offset;
-                auto &g =
-                    grid_nodes_[grid_idx[1] * (kGridSize + 1) + grid_idx[0]];
-                g.velocity +=
-                    weight * (kParticleMass * p.velocity + affine * distance);
-                g.mass += weight * kParticleMass;
+                distance *= kDeltaX;
+                int x = base.x() + i;
+                int y = base.y() + j;
+                auto &g = grid_nodes_[y * (kGridSize + 1) + x];
+                g.v += weight * (kParticleMass * p.v + affine * distance);
+                g.v += weight * stress * Vec3(1.0f, distance.x(), distance.y());
+                g.m += weight * kParticleMass;
             }
         }
     }
@@ -91,48 +94,51 @@ void MPM::update() {
         auto id = g.vertex->id;
         auto x = id % (kGridSize + 1);
         auto y = id / (kGridSize + 1);
-        if (g.mass <= 0.0f) {
+        if (g.m <= 0.0f) {
             continue;
         }
-        g.velocity /= g.mass;
-        g.velocity += kDeltaT * kGravity * 30.0f;
-        if (x < 3 && g.velocity[0] < 0.0f) {
-            g.velocity[0] = 0.0f;
+        g.v /= g.m;
+        g.v += kDeltaT * kGravity * 30.0f;
+        if (x < 3 && g.v[0] < 0.0f) {
+            g.v[0] = 0.0f;
         }
-        if (x > kGridSize - 3 && g.velocity[0] > 0.0f) {
-            g.velocity[0] = 0.0f;
+        if (x > kGridSize - 3 && g.v[0] > 0.0f) {
+            g.v[0] = 0.0f;
         }
-        if (y < 3 && g.velocity[1] < 0.0f) {
-            g.velocity[1] = 0.0f;
+        if (y < 3 && g.v[1] < 0.0f) {
+            g.v[1] = 0.0f;
         }
-        if (y > kGridSize - 3 && g.velocity[1] > 0.0f) {
-            g.velocity[1] = 0.0f;
+        if (y > kGridSize - 3 && g.v[1] > 0.0f) {
+            g.v[1] = 0.0f;
         }
     }
     // G2P
     for (auto &p : particles_) {
-        Vectori base = ((p.position * kInvDeltaX).array() - 0.5f).cast<int>();
-        Vector fx = p.position * kInvDeltaX - base.cast<float>();
-        Vector weights[3] = {0.5f * (1.5f - fx.array()).square(),
-                             0.75f - (fx.array() - 1.0f).square(),
-                             0.5f * (fx.array() - 0.5f).square()};
-        Vector new_velocity = Vector::Zero();
-        Matrix new_affine_matrix = Matrix::Zero();
+        Vec2i base = ((p.x * kInvDeltaX).array() - 0.5f).cast<int>();
+        Vec2 fx = p.x * kInvDeltaX - base.cast<float>();
+        Vec2 weights[3] = {0.5f * (1.5f - fx.array()).square(),
+                           0.75f - (fx.array() - 1.0f).square(),
+                           0.5f * (fx.array() - 0.5f).square()};
+        Vec2 new_v = Vec2::Zero();
+        Mat2 new_C = Mat2::Zero();
+        Mat3 new_M = Mat3::Zero();
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                auto offset = Vectori(i, j);
-                Vector distance = offset.cast<float>() - fx;
-                Vectori grid_idx = base + offset;
-                const auto &g =
-                    grid_nodes_[grid_idx[1] * (kGridSize + 1) + grid_idx[0]];
+                auto offset = Vec2i(i, j);
+                Vec2 distance = (offset.cast<float>() - fx) * kDeltaX;
+                int x = base.x() + i;
+                int y = base.y() + j;
+                const auto &g = grid_nodes_[y * (kGridSize + 1) + x];
                 auto weight = weights[i][0] * weights[j][1];
-                new_velocity += weight * g.velocity;
-                new_affine_matrix += 4.0f * kInvDeltaX * weight *
-                                     (g.velocity * distance.transpose());
+                new_v += weight * g.v;
+                new_C += weight * (g.v * distance.transpose());
+                Vec3 P(1.0f, distance.x(), distance.y());
+                new_M += weight * P * P.transpose();
             }
         }
-        p.velocity = new_velocity;
-        p.affine_matrix = new_affine_matrix;
-        p.position += kDeltaT * p.velocity;
+        p.v = new_v;
+        p.M_inv = new_M.inverse();
+        p.C = new_C * new_M.block<2, 2>(1, 1).inverse();
+        p.x += kDeltaT * p.v;
     }
 }

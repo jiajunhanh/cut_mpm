@@ -251,8 +251,8 @@ static void show_cut_mesh() {
         }
         for (const auto &p : mpm.particles()) {
             draw_list->AddCircleFilled(
-                ImVec2(origin.x + p.position.x() * canvas_width,
-                       origin.y + p.position.y() * canvas_width),
+                ImVec2(origin.x + p.x.x() * canvas_width,
+                       origin.y + p.x.y() * canvas_width),
                 2, IM_COL32(6, 133, 135, 255));
         }
     } else {
@@ -291,7 +291,7 @@ int main() {
 
     // Create window with graphics context
     GLFWwindow *window = glfwCreateWindow(
-        1280, 720, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
+        800, 800, "Dear ImGui GLFW+OpenGL3 example", nullptr, nullptr);
     if (window == nullptr) return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);  // Enable vsync

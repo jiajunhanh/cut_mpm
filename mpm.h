@@ -9,21 +9,25 @@
 
 class MPM {
    public:
-    using Vector = Eigen::Vector2f;
-    using Vectori = Eigen::Vector2i;
-    using Matrix = Eigen::Matrix2f;
+    using Vec2 = Eigen::Vector2f;
+    using Vec2i = Eigen::Vector2i;
+    using Vec3 = Eigen::Vector3f;
+    using Mat2 = Eigen::Matrix2f;
+    using Mat3 = Eigen::Matrix3f;
+    using Mat23 = Eigen::Matrix<float, 2, 3>;
 
     struct Particle {
-        Vector position;
-        Vector velocity;
-        Matrix deformation_gradient = Matrix::Identity();
-        Matrix affine_matrix;
+        Vec2 x = Vec2::Zero();
+        Vec2 v = Vec2::Zero();
+        Mat2 F = Mat2::Identity();
+        Mat2 C = Mat2::Zero();
+        Mat3 M_inv = Mat3::Zero();
     };
 
     struct GridNode {
-        float mass = 0.0f;
-        Vector velocity;
-        HalfEdgeMesh::VertexRef vertex;
+        float m = 0.0f;
+        Vec2 v = Vec2::Zero();
+        HalfEdgeMesh::VertexRef vertex{};
     };
 
     explicit MPM(const std::shared_ptr<HalfEdgeMesh>& cut_mesh_);
