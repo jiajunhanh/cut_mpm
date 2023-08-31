@@ -20,7 +20,7 @@ class MPM {
         Vec2 x = Vec2::Zero();
         Vec2 v = Vec2::Zero();
         Mat2 F = Mat2::Identity();
-        Mat2 C = Mat2::Zero();
+        Mat23 C = Mat23::Zero();
         Mat3 M_inv = Mat3::Zero();
     };
 

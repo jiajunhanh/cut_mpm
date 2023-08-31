@@ -23,9 +23,10 @@ static float random_float() {
 
 static float interpolate(float x) {
     x = std::abs(x);
-    if (x < 0.5f) return 0.75f - x * x;
+    /*if (x < 0.5f) return 0.75f - x * x;
     if (x < 1.5f) return 0.5f * (1.5f - x) * (1.5f - x);
-    return 0.0f;
+    return 0.0f;*/
+    return std::max(0.0f, 0.75f - 0.5f * x);
 }
 
 static auto svd(const MPM::Mat2 &m) {
@@ -62,7 +63,7 @@ void MPM::update() {
     for (Particle &p : particles_) {
         Vec2i base = ((p.x * kInvDeltaX).array() - 0.5f).cast<int>();
         Vec2 fx = p.x * kInvDeltaX - base.cast<float>();
-        p.F = (Mat2::Identity() + kDeltaT * p.C) * p.F;
+        p.F = (Mat2::Identity() + kDeltaT * p.C.block<2, 2>(0, 1)) * p.F;
         float hardening_coefficient = 0.5f;
         float mu = kMu0 * hardening_coefficient;
         float lambda = kLambda0 * hardening_coefficient;
@@ -71,25 +72,34 @@ void MPM::update() {
         Mat2 PF = 2.0f * mu * (p.F - U * V.transpose()) * p.F.transpose() +
                   Mat2::Identity() * lambda * J * (J - 1.0f);
         Mat3 M_inv = p.M_inv;
-        Mat23 stress = Mat23::Zero();
+        Mat23 affine = Mat23::Zero();
         for (int i = 0; i < 2; ++i) {
             for (int j = 0; j < 2; ++j)
-                stress.row(i) += M_inv.row(j + 1) * PF(i, j);
+                affine.row(i) += M_inv.row(j + 1) * PF(i, j);
         }
-        stress *= -kDeltaT * kParticleVolume;
-        Mat2 affine = kParticleMass * p.C;
+        affine *= -kDeltaT * kParticleVolume;
+        affine += kParticleMass * p.C;
+        float weight_sum = 0.0f;
+        float weights[3][3];
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
                 Vec2i offset(i, j);
                 Vec2 distance = (offset.cast<float>() - fx);
-                float weight =
+                weights[i][j] =
                     interpolate(distance.x()) * interpolate(distance.y());
+                weight_sum += weights[i][j];
+            }
+        }
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                Vec3 distance(1.0f, static_cast<float>(i) - fx.x(),
+                              static_cast<float>(j) - fx.y());
+                float weight = weights[i][j] / weight_sum;
                 distance *= kDeltaX;
                 int x = base.x() + i;
                 int y = base.y() + j;
                 GridNode &g = grid_nodes_[y * (kGridSize + 1) + x];
-                g.v += weight * (kParticleMass * p.v + affine * distance);
-                g.v += weight * stress * Vec3(1.0f, distance.x(), distance.y());
+                g.v += weight * affine * distance;
                 g.m += weight * kParticleMass;
             }
         }
@@ -111,28 +121,37 @@ void MPM::update() {
     for (Particle &p : particles_) {
         Vec2i base = ((p.x * kInvDeltaX).array() - 0.5f).cast<int>();
         Vec2 fx = p.x * kInvDeltaX - base.cast<float>();
-        Vec2 new_v = Vec2::Zero();
-        Mat2 new_C = Mat2::Zero();
-        Mat3 new_M = Mat3::Zero();
+        float weight_sum = 0.0f;
+        float weights[3][3];
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
                 Vec2i offset(i, j);
                 Vec2 distance = (offset.cast<float>() - fx);
-                float weight =
+                weights[i][j] =
                     interpolate(distance.x()) * interpolate(distance.y());
+                weight_sum += weights[i][j];
+            }
+        }
+        Vec2 new_v = Vec2::Zero();
+        Mat23 new_C = Mat23::Zero();
+        Mat3 new_M = Mat3::Zero();
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                Vec3 distance(1.0f, static_cast<float>(i) - fx.x(),
+                              static_cast<float>(j) - fx.y());
+                float weight = weights[i][j] / weight_sum;
                 distance *= kDeltaX;
                 int x = base.x() + i;
                 int y = base.y() + j;
                 const GridNode &g = grid_nodes_[y * (kGridSize + 1) + x];
                 new_v += weight * g.v;
                 new_C += weight * (g.v * distance.transpose());
-                Vec3 P(1.0f, distance.x(), distance.y());
-                new_M += weight * P * P.transpose();
+                new_M += weight * distance * distance.transpose();
             }
         }
         p.v = new_v;
         p.M_inv = new_M.inverse();
-        p.C = new_C * new_M.block<2, 2>(1, 1).inverse();
+        p.C = new_C * new_M.inverse();
         p.x += kDeltaT * p.v;
     }
 }
