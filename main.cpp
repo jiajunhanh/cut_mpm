@@ -628,7 +628,7 @@ static void show_cut_mesh() {
             mpm.initialize();
             simulating = true;
         }
-        for (int i = 0; i < 30; ++i) {
+        for (int i = 0; i < 16; ++i) {
             mpm.update();
         }
         for (const auto& p : mpm.particles()) {

@@ -27,6 +27,7 @@ static float interpolate(float x) {
     if (x < 1.5f) return 0.5f * (1.5f - x) * (1.5f - x);
     return 0.0f;*/
     return std::max(0.0f, 0.75f - 0.5f * x);
+    // return std::max(0.0f, 1.0f - (1.0f / (1.5f * 1.5f)) * x * x);
 }
 
 static auto svd(const MPM::Mat2& m) {
