@@ -26,5 +26,5 @@ struct Edge {
 };
 
 HalfEdgeMesh construct_cut_mesh(
-    const std::vector<std::array<float, 2>> &vertices,
-    const std::vector<std::array<int, 2>> &edges);
+    const std::vector<std::array<float, 2>>& vertices,
+    const std::vector<std::array<int, 2>>& edges);

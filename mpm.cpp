@@ -29,13 +29,13 @@ static float interpolate(float x) {
     return std::max(0.0f, 0.75f - 0.5f * x);
 }
 
-static auto svd(const MPM::Mat2 &m) {
+static auto svd(const MPM::Mat2& m) {
     Eigen::JacobiSVD<MPM::Mat2, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(
         m);
     return std::tuple{svd.matrixU(), svd.singularValues(), svd.matrixV()};
 }
 
-MPM::MPM(const std::shared_ptr<HalfEdgeMesh> &cut_mesh_)
+MPM::MPM(const std::shared_ptr<HalfEdgeMesh>& cut_mesh_)
     : cut_mesh_(cut_mesh_) {
     int n_vertices = static_cast<int>(cut_mesh_->vertices().size());
     grid_nodes_.resize(n_vertices);
@@ -48,19 +48,19 @@ MPM::MPM(const std::shared_ptr<HalfEdgeMesh> &cut_mesh_)
 void MPM::initialize() {
     particles_.clear();
     particles_.resize(kParticleNumber);
-    for (Particle &p : particles_) {
+    for (Particle& p : particles_) {
         p.x.x() = random_float() * 0.35f + 0.2f;
         p.x.y() = random_float() * 0.35f + 0.2f;
     }
 }
 
 void MPM::update() {
-    for (GridNode &g : grid_nodes_) {
+    for (GridNode& g : grid_nodes_) {
         g.m = 0.0f;
         g.v.setZero();
     }
     // P2G
-    for (Particle &p : particles_) {
+    for (Particle& p : particles_) {
         Vec2i base = ((p.x * kInvDeltaX).array() - 0.5f).cast<int>();
         Vec2 fx = p.x * kInvDeltaX - base.cast<float>();
         p.F = (Mat2::Identity() + kDeltaT * p.C.block<2, 2>(0, 1)) * p.F;
@@ -98,14 +98,14 @@ void MPM::update() {
                 distance *= kDeltaX;
                 int x = base.x() + i;
                 int y = base.y() + j;
-                GridNode &g = grid_nodes_[y * (kGridSize + 1) + x];
+                GridNode& g = grid_nodes_[y * (kGridSize + 1) + x];
                 g.v += weight * affine * distance;
                 g.m += weight * kParticleMass;
             }
         }
     }
     // Grid update
-    for (GridNode &g : grid_nodes_) {
+    for (GridNode& g : grid_nodes_) {
         int id = g.vertex->id;
         int x = id % (kGridSize + 1);
         int y = id / (kGridSize + 1);
@@ -118,7 +118,7 @@ void MPM::update() {
         if (y > kGridSize - 3 && g.v[1] > 0.0f) g.v[1] = 0.0f;
     }
     // G2P
-    for (Particle &p : particles_) {
+    for (Particle& p : particles_) {
         Vec2i base = ((p.x * kInvDeltaX).array() - 0.5f).cast<int>();
         Vec2 fx = p.x * kInvDeltaX - base.cast<float>();
         float weight_sum = 0.0f;
@@ -143,7 +143,7 @@ void MPM::update() {
                 distance *= kDeltaX;
                 int x = base.x() + i;
                 int y = base.y() + j;
-                const GridNode &g = grid_nodes_[y * (kGridSize + 1) + x];
+                const GridNode& g = grid_nodes_[y * (kGridSize + 1) + x];
                 new_v += weight * g.v;
                 new_C += weight * (g.v * distance.transpose());
                 new_M += weight * distance * distance.transpose();
