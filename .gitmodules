@@ -10,3 +10,6 @@
 [submodule "deps/eigen"]
 	path = deps/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "deps/sdl"]
+	path = deps/sdl
+	url = https://github.com/libsdl-org/SDL.git
