@@ -13,9 +13,8 @@ add_executable(mandoline2d
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_draw.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_tables.cpp
         ${PROJECT_SOURCE_DIR}/deps/imgui/imgui_widgets.cpp
-        ${PROJECT_SOURCE_DIR}/deps/imgui/backends/imgui_impl_glfw.cpp
-        ${PROJECT_SOURCE_DIR}/deps/imgui/backends/imgui_impl_opengl3.cpp
-        ${PROJECT_SOURCE_DIR}/deps/glad/src/gl.c
+        ${PROJECT_SOURCE_DIR}/deps/imgui/backends/imgui_impl_sdl2.cpp
+        ${PROJECT_SOURCE_DIR}/deps/imgui/backends/imgui_impl_vulkan.cpp
 )
 
 target_include_directories(mandoline2d PRIVATE
@@ -23,21 +22,18 @@ target_include_directories(mandoline2d PRIVATE
         ${PROJECT_SOURCE_DIR}/deps/eigen
         ${PROJECT_SOURCE_DIR}/deps/imgui
         ${PROJECT_SOURCE_DIR}/deps/imgui/backends
-        ${PROJECT_SOURCE_DIR}/deps/glad/include
 )
 
-find_package(OpenGL REQUIRED)
-target_link_libraries(mandoline2d OpenGL::GL)
-
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(deps/glfw)
-target_link_libraries(mandoline2d glfw)
+find_package(Vulkan REQUIRED)
+target_link_libraries(mandoline2d PRIVATE Vulkan::Vulkan)
 
 add_subdirectory(deps/fmt)
-target_link_libraries(mandoline2d fmt::fmt)
+target_link_libraries(mandoline2d PRIVATE fmt::fmt)
+
+add_subdirectory(deps/sdl)
+target_link_libraries(mandoline2d PRIVATE SDL2::SDL2main)
+target_link_libraries(mandoline2d PRIVATE SDL2::SDL2)
+target_include_directories(mandoline2d PRIVATE ${PROJECT_SOURCE_DIR}/deps/sdl/include)
 
 target_compile_options(mandoline2d PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/W3 /WX /wd4819>
