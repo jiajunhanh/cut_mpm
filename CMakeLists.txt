@@ -27,9 +27,6 @@ target_include_directories(mandoline2d PRIVATE
 find_package(Vulkan REQUIRED)
 target_link_libraries(mandoline2d PRIVATE Vulkan::Vulkan)
 
-add_subdirectory(deps/fmt)
-target_link_libraries(mandoline2d PRIVATE fmt::fmt)
-
 add_subdirectory(deps/sdl)
 target_link_libraries(mandoline2d PRIVATE SDL2::SDL2main)
 target_link_libraries(mandoline2d PRIVATE SDL2::SDL2)
