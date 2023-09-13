@@ -185,7 +185,7 @@ static void SetupVulkan(ImVector<const char*> instance_extensions) {
                 break;
             }
         free(queues);
-        IM_ASSERT(g_QueueFamily != stacic_cast<uint32_t>(-1));
+        IM_ASSERT(g_QueueFamily != static_cast<uint32_t>(-1));
     }
 
     // Create Logical Device (with 1 queue)
