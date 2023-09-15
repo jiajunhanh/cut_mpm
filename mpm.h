@@ -27,10 +27,11 @@ class MPM {
     struct GridNode {
         float m = 0.0f;
         Vec2 v = Vec2::Zero();
-        HalfEdgeMesh::VertexRef vertex{};
+        CutMesh::VertexRef vertex{};
+        std::vector<CutMesh::FaceRef> faces{};
     };
 
-    explicit MPM(const std::shared_ptr<HalfEdgeMesh>& cut_mesh_);
+    explicit MPM(const std::shared_ptr<CutMesh>& cut_mesh_);
     void initialize();
     void update();
     [[nodiscard]] const std::vector<Particle>& particles() const {
@@ -38,7 +39,7 @@ class MPM {
     }
 
    private:
-    std::shared_ptr<HalfEdgeMesh> cut_mesh_;
+    std::shared_ptr<CutMesh> cut_mesh_;
     std::vector<Particle> particles_;
     std::vector<GridNode> grid_nodes_;
 };

@@ -12,7 +12,6 @@
 #include <vector>
 
 #include "cut_mesh.h"
-#include "half_edge.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_vulkan.h"
@@ -425,7 +424,7 @@ static void show_cut_mesh() {
     static std::vector<std::array<float, 2>> vertices;
     static std::vector<std::array<int, 2>> edges;
     static auto cut_mesh =
-        std::make_shared<HalfEdgeMesh>(construct_cut_mesh(vertices, edges));
+        std::make_shared<CutMesh>(construct_cut_mesh(vertices, edges));
     static MPM mpm(cut_mesh);
     static bool opt_enable_grid = true;
     static bool opt_construct_cut_mesh = false;
@@ -460,7 +459,7 @@ static void show_cut_mesh() {
         opt_simulation = false;
     }
     if (ImGui::Button("Clear cut-mesh")) {
-        *cut_mesh = HalfEdgeMesh();
+        cut_mesh.reset();
         selected_half_edge = cut_mesh->half_edges().end();
     }
     ImGui::Text(

@@ -1,30 +1,102 @@
 #pragma once
 
+#include <Eigen/Dense>
 #include <iostream>
+#include <list>
+#include <stack>
+#include <utility>
 #include <vector>
 
-#include "half_edge.h"
 #include "mpm_config.h"
 
-struct Vertex {
-    int c[2] = {};
-    float q[2] = {};
-    bool b[2] = {};
-
-    [[nodiscard]] float coord(int d) const {
-        return static_cast<float>(c[d]) + q[d];
-    }
-
-    [[nodiscard]] int node_id() const { return c[1] * (kGridSize + 1) + c[0]; }
-};
-
-struct Edge {
+class CutMesh {
    public:
-    int i = 0;  // point id
-    int j = 0;  // point id
-    Edge(int i_, int j_) : i(i_), j(j_) {}
+    struct HalfEdge;
+    struct Vertex;
+    struct Edge;
+    struct Face;
+
+    using HalfEdgeRef = std::vector<HalfEdge>::iterator;
+    using VertexRef = std::vector<Vertex>::iterator;
+    using EdgeRef = std::vector<Edge>::iterator;
+    using FaceRef = std::vector<Face>::iterator;
+
+    struct HalfEdge {
+        HalfEdgeRef twin;
+        HalfEdgeRef next;
+        EdgeRef edge;
+        VertexRef vertex;
+        FaceRef face;
+
+        int id{};
+
+        void set_tnvef(const HalfEdgeRef& twin_, const HalfEdgeRef& next_,
+                       const VertexRef& vertex_, const EdgeRef& edge_,
+                       const FaceRef& face_) {
+            twin = twin_;
+            next = next_;
+            vertex = vertex_;
+            edge = edge_;
+            face = face_;
+        }
+    };
+
+    struct Edge {
+        HalfEdgeRef half_edge;
+        int id{};
+    };
+
+    struct Vertex {
+        HalfEdgeRef half_edge;
+        int id{};
+        int grid_id{};
+        Eigen::Vector2f position{};
+        std::array<bool, 2> on_edge{};
+    };
+
+    struct Face {
+        HalfEdgeRef half_edge;
+        int id{};
+    };
+
+    struct Grid {
+        VertexRef vertex;
+        std::vector<FaceRef> faces;
+    };
+
+    auto& half_edges() { return half_edges_; }
+    auto& vertices() { return vertices_; }
+    auto& edges() { return edges_; }
+    auto& faces() { return faces_; }
+    auto& grids() { return grids_; }
+    [[nodiscard]] const auto& half_edges() const { return half_edges_; }
+    [[nodiscard]] const auto& vertices() const { return vertices_; }
+    [[nodiscard]] const auto& edges() const { return edges_; }
+    [[nodiscard]] const auto& faces() const { return faces_; }
+    [[nodiscard]] const auto& grids() const { return grids_; }
+
+    HalfEdgeRef emplace_half_edge();
+    VertexRef emplace_vertex();
+    EdgeRef emplace_edge();
+    FaceRef emplace_face();
+
+    // void erase_half_edge(HalfEdgeRef&& h);
+    // void erase_vertex(VertexRef&& v);
+    // void erase_edge(EdgeRef&& e);
+    // void erase_face(FaceRef&& f);
+
+   private:
+    int next_id{};
+    std::vector<HalfEdge> half_edges_;
+    std::vector<Vertex> vertices_;
+    std::vector<Edge> edges_;
+    std::vector<Face> faces_;
+    std::vector<Grid> grids_;
+    // std::stack<HalfEdgeRef> recycled_half_edges_;
+    // std::stack<VertexRef> recycled_vertices_;
+    // std::stack<EdgeRef> recycled_edges_;
+    // std::stack<FaceRef> recycled_faces_;
 };
 
-HalfEdgeMesh construct_cut_mesh(
-    const std::vector<std::array<float, 2>>& vertices,
-    const std::vector<std::array<int, 2>>& edges);
+CutMesh construct_cut_mesh(const std::vector<std::array<float, 2>>& vertices,
+                           const std::vector<std::array<int, 2>>& edges);

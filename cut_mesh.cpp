@@ -2,8 +2,30 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 
-constexpr static int kGridNodesNumber = (kGridSize + 1) * (kGridSize + 1);
+constexpr static int kGridNodesNumber = kGridRowSize * kGridRowSize;
+
+namespace {
+struct Vertex {
+    int c[2] = {};
+    float q[2] = {};
+    bool b[2] = {};
+
+    [[nodiscard]] float coord(int d) const {
+        return static_cast<float>(c[d]) + q[d];
+    }
+
+    [[nodiscard]] int node_id() const { return c[1] * (kGridSize + 1) + c[0]; }
+};
+
+struct Edge {
+   public:
+    int i = 0;
+    int j = 0;
+    Edge(int i_, int j_) : i(i_), j(j_) {}
+};
+}  // namespace
 
 static void lerp(Vertex& v, const Vertex& vi, const Vertex& vj, float t,
                  int d) {
@@ -30,7 +52,7 @@ static void add_grid_edges(std::vector<Vertex>& cut_vertices,
     }
     for (int y = 0; y < kGridSize; ++y) {
         for (int x = 0; x < kGridSize; ++x) {
-            int node_i = y * (kGridSize + 1) + x;
+            int node_i = y * kGridRowSize + x;
             for (int d = 0; d < 2; ++d) {
                 auto& v = grid_cut_vertices[y * kGridSize + x][d];
                 int node_j = node_i + d * kGridSize + 1;
@@ -51,10 +73,10 @@ static void add_grid_edges(std::vector<Vertex>& cut_vertices,
         }
     }
     for (int i = 0; i < kGridSize; ++i) {
-        cut_edges.emplace_back(i * (kGridSize + 1) + kGridSize,
-                               (i + 1) * (kGridSize + 1) + kGridSize);
-        cut_edges.emplace_back(kGridSize * (kGridSize + 1) + i,
-                               kGridSize * (kGridSize + 1) + i + 1);
+        cut_edges.emplace_back(i * kGridRowSize + kGridSize,
+                               (i + 1) * kGridRowSize + kGridSize);
+        cut_edges.emplace_back(kGridSize * kGridRowSize + i,
+                               kGridSize * kGridRowSize + i + 1);
     }
 }
 
@@ -64,8 +86,8 @@ compute_cut_vertices_and_edges(
     const std::vector<std::array<int, 2>>& edges) {
     std::vector<Vertex> cut_vertices;
     std::vector<Edge> cut_edges;
-    for (int y = 0; y <= kGridSize; ++y) {
-        for (int x = 0; x <= kGridSize; ++x) {
+    for (int y = 0; y < kGridRowSize; ++y) {
+        for (int x = 0; x < kGridRowSize; ++x) {
             Vertex v{};
             v.c[0] = x;
             v.c[1] = y;
@@ -143,27 +165,32 @@ compute_cut_vertices_and_edges(
     return {cut_vertices, cut_edges};
 }
 
-HalfEdgeMesh construct_cut_mesh(
-    const std::vector<std::array<float, 2>>& vertices,
-    const std::vector<std::array<int, 2>>& edges) {
+CutMesh construct_cut_mesh(const std::vector<std::array<float, 2>>& vertices,
+                           const std::vector<std::array<int, 2>>& edges) {
     auto [cut_vertices, cut_edges] =
         compute_cut_vertices_and_edges(vertices, edges);
 
-    HalfEdgeMesh cut_mesh;
-    std::vector<HalfEdgeMesh::VertexRef> mesh_vertices;
-    std::vector<std::vector<HalfEdgeMesh::HalfEdgeRef>> vertex_half_edges;
+    CutMesh cut_mesh;
+    std::vector<CutMesh::VertexRef> mesh_vertices;
+    std::vector<std::vector<CutMesh::HalfEdgeRef>> vertex_half_edges;
+    cut_mesh.vertices().reserve(cut_vertices.size());
     mesh_vertices.reserve(cut_vertices.size());
     vertex_half_edges.resize(cut_vertices.size());
 
     for (const Vertex& cut_vertex : cut_vertices) {
         auto v = cut_mesh.emplace_vertex();
-        for (int d = 0; d < 2; ++d)
+        for (int d = 0; d < 2; ++d) {
             v->position[d] =
                 static_cast<float>(cut_vertex.c[d]) + cut_vertex.q[d];
+            v->on_edge[d] = cut_vertex.b[d];
+        }
+        v->grid_id = cut_vertex.c[1] * kGridSize + cut_vertex.c[0];
         v->position /= kGridSize;
         mesh_vertices.emplace_back(v);
     }
 
+    cut_mesh.half_edges().reserve(2 * cut_edges.size());
+    cut_mesh.edges().reserve(cut_edges.size());
     for (const Edge& cut_edge : cut_edges) {
         auto h0 = cut_mesh.emplace_half_edge();
         auto h1 = cut_mesh.emplace_half_edge();
@@ -206,19 +233,38 @@ HalfEdgeMesh construct_cut_mesh(
         }
     }
 
+    std::unordered_set<int> visited_half_edges;
     for (auto half_edge = begin(cut_mesh.half_edges()),
               half_edges_end = end(cut_mesh.half_edges());
          half_edge != half_edges_end; ++half_edge) {
-        if (half_edge->face != cut_mesh.faces().end()) {
-            continue;
-        }
+        if (visited_half_edges.count(half_edge->id)) continue;
         auto f = cut_mesh.emplace_face();
         f->half_edge = half_edge;
         auto h = half_edge;
         do {
-            h->face = f;
+            visited_half_edges.emplace(h->id);
             h = h->next;
         } while (h != half_edge);
+    }
+
+    cut_mesh.grids().resize(kGridSize * kGridSize);
+    for (auto face = begin(cut_mesh.faces()), faces_end = end(cut_mesh.faces());
+         face != faces_end; ++face) {
+        int grid_id = face->half_edge->vertex->grid_id;
+        cut_mesh.grids()[grid_id].faces.emplace_back(face);
+        auto half_edge = face->half_edge;
+        auto h = half_edge;
+        do {
+            h->face = face;
+            h = h->next;
+        } while (h != half_edge);
+    }
+
+    for (int y = 0; y < kGridSize; ++y) {
+        for (int x = 0; x < kGridSize; ++x) {
+            cut_mesh.grids()[y * kGridSize + x].vertex =
+                mesh_vertices[y * kGridRowSize + x];
+        }
     }
 
     return cut_mesh;
