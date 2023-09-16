@@ -9,12 +9,16 @@
 
 class MPM {
    public:
-    using Vec2 = Eigen::Vector2f;
     using Vec2i = Eigen::Vector2i;
-    using Vec3 = Eigen::Vector3f;
-    using Mat2 = Eigen::Matrix2f;
-    using Mat3 = Eigen::Matrix3f;
-    using Mat23 = Eigen::Matrix<float, 2, 3>;
+    using Mat23 = Eigen::Matrix<Real, 2, 3>;
+    using Vec2 = std::conditional_t<std::is_same_v<Real, float>,
+                                    Eigen::Vector2f, Eigen::Vector2d>;
+    using Vec3 = std::conditional_t<std::is_same_v<Real, float>,
+                                    Eigen::Vector3f, Eigen::Vector3d>;
+    using Mat2 = std::conditional_t<std::is_same_v<Real, float>,
+                                    Eigen::Matrix2f, Eigen::Matrix2d>;
+    using Mat3 = std::conditional_t<std::is_same_v<Real, float>,
+                                    Eigen::Matrix3f, Eigen::Matrix3d>;
 
     struct Particle {
         Vec2 x = Vec2::Zero();
@@ -25,7 +29,7 @@ class MPM {
     };
 
     struct GridNode {
-        float m = 0.0f;
+        Real m = 0.0;
         Vec2 v = Vec2::Zero();
         CutMesh::VertexRef vertex{};
         std::vector<CutMesh::FaceRef> faces{};

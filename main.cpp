@@ -421,7 +421,7 @@ static void show_cut_mesh() {
         return;
     }
 
-    static std::vector<std::array<float, 2>> vertices;
+    static std::vector<std::array<Real, 2>> vertices;
     static std::vector<std::array<int, 2>> edges;
     static auto cut_mesh =
         std::make_shared<CutMesh>(construct_cut_mesh(vertices, edges));
@@ -459,7 +459,7 @@ static void show_cut_mesh() {
         opt_simulation = false;
     }
     if (ImGui::Button("Clear cut-mesh")) {
-        cut_mesh.reset();
+        cut_mesh = std::make_shared<CutMesh>();
         selected_half_edge = cut_mesh->half_edges().end();
     }
     ImGui::Text(
@@ -492,16 +492,18 @@ static void show_cut_mesh() {
         ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         if (vertices.empty()) {
             vertices.emplace_back(
-                std::array{mouse_pos_in_canvas.x / canvas_width,
-                           mouse_pos_in_canvas.y / canvas_width});
+                std::array{Real{mouse_pos_in_canvas.x} / canvas_width,
+                           Real{mouse_pos_in_canvas.y} / canvas_width});
         }
-        vertices.emplace_back(std::array{mouse_pos_in_canvas.x / canvas_width,
-                                         mouse_pos_in_canvas.y / canvas_width});
+        vertices.emplace_back(
+            std::array{Real{mouse_pos_in_canvas.x} / canvas_width,
+                       Real{mouse_pos_in_canvas.y} / canvas_width});
         adding_line = true;
     }
     if (adding_line) {
-        vertices.back() = std::array{mouse_pos_in_canvas.x / canvas_width,
-                                     mouse_pos_in_canvas.y / canvas_width};
+        vertices.back() =
+            std::array{Real{mouse_pos_in_canvas.x} / canvas_width,
+                       Real{mouse_pos_in_canvas.y} / canvas_width};
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) adding_line = false;
     }
 
@@ -524,10 +526,10 @@ static void show_cut_mesh() {
 
     // Construct cut-mesh
     for (auto& v : vertices) {
-        v[0] = std::clamp(v[0], 0.0f,
-                          1.0f - std::numeric_limits<float>::epsilon());
-        v[1] = std::clamp(v[1], 0.0f,
-                          1.0f - std::numeric_limits<float>::epsilon());
+        v[0] = std::clamp(Real{v[0]}, Real{0.0},
+                          Real{1.0} - std::numeric_limits<Real>::epsilon());
+        v[1] = std::clamp(Real{v[1]}, Real{0.0},
+                          Real{1.0} - std::numeric_limits<Real>::epsilon());
     }
     if (opt_construct_cut_mesh) {
         edges.clear();
@@ -562,19 +564,28 @@ static void show_cut_mesh() {
     if (opt_draw_original_lines) {
         for (size_t n = 0; n + 1 < vertices.size(); ++n) {
             draw_list->AddLine(
-                ImVec2(origin.x + vertices[n][0] * canvas_width,
-                       origin.y + vertices[n][1] * canvas_width),
-                ImVec2(origin.x + vertices[n + 1][0] * canvas_width,
-                       origin.y + vertices[n + 1][1] * canvas_width),
+                ImVec2(static_cast<float>(origin.x +
+                                          vertices[n][0] * canvas_width),
+                       static_cast<float>(origin.y +
+                                          vertices[n][1] * canvas_width)),
+                ImVec2(static_cast<float>(origin.x +
+                                          vertices[n + 1][0] * canvas_width),
+                       static_cast<float>(origin.y +
+                                          vertices[n + 1][1] * canvas_width)),
                 IM_COL32(0, 0, 0, 255), 2.0f);
         }
         if (vertices.size() >= 3) {
             draw_list->AddLine(
-                ImVec2(origin.x + vertices[0][0] * canvas_width,
-                       origin.y + vertices[0][1] * canvas_width),
-                ImVec2(
-                    origin.x + vertices[vertices.size() - 1][0] * canvas_width,
-                    origin.y + vertices[vertices.size() - 1][1] * canvas_width),
+                ImVec2(static_cast<float>(origin.x +
+                                          vertices[0][0] * canvas_width),
+                       static_cast<float>(origin.y +
+                                          vertices[0][1] * canvas_width)),
+                ImVec2(static_cast<float>(origin.x +
+                                          vertices[vertices.size() - 1][0] *
+                                              canvas_width),
+                       static_cast<float>(origin.y +
+                                          vertices[vertices.size() - 1][1] *
+                                              canvas_width)),
                 IM_COL32(0, 0, 0, 255), 2.0f);
         }
     }
@@ -587,8 +598,10 @@ static void show_cut_mesh() {
             }*/
             auto pos0 = v0->position * canvas_width;
             auto pos1 = v1->position * canvas_width;
-            ImVec2 p0(origin.x + pos0.x(), origin.y + pos0.y());
-            ImVec2 p1(origin.x + pos1.x(), origin.y + pos1.y());
+            ImVec2 p0(origin.x + static_cast<float>(pos0.x()),
+                      origin.y + static_cast<float>(pos0.y()));
+            ImVec2 p1(static_cast<float>(origin.x + pos1.x()),
+                      static_cast<float>(origin.y + pos1.y()));
             draw_list->AddLine(p0, p1, IM_COL32(0, 0, 0, 255), 2);
         }
     }
@@ -607,17 +620,22 @@ static void show_cut_mesh() {
                                3.0f);
         const auto& v0 = selected_half_edge->vertex;
         const auto& v1 = selected_half_edge->twin->vertex;
-        draw_list->AddLine(ImVec2(origin.x + v0->position.x() * canvas_width,
-                                  origin.y + v0->position.y() * canvas_width),
-                           ImVec2(origin.x + v1->position.x() * canvas_width,
-                                  origin.y + v1->position.y() * canvas_width),
-                           IM_COL32(0, 0, 255, 255), 4.0f);
+        draw_list->AddLine(
+            ImVec2(
+                origin.x + static_cast<float>(v0->position.x()) * canvas_width,
+                origin.y + static_cast<float>(v0->position.y()) * canvas_width),
+            ImVec2(
+                static_cast<float>(origin.x + v1->position.x()) * canvas_width,
+                static_cast<float>(origin.y + v1->position.y()) * canvas_width),
+            IM_COL32(0, 0, 255, 255), 4.0f);
     }
     if (opt_draw_cut_vertices) {
         for (const auto& v : cut_mesh->vertices()) {
             draw_list->AddCircleFilled(
-                ImVec2(origin.x + v.position.x() * canvas_width,
-                       origin.y + v.position.y() * canvas_width),
+                ImVec2(static_cast<float>(origin.x + v.position.x()) *
+                           canvas_width,
+                       static_cast<float>(origin.y + v.position.y()) *
+                           canvas_width),
                 4, IM_COL32(255, 0, 0, 255));
         }
     }
@@ -632,8 +650,8 @@ static void show_cut_mesh() {
         }
         for (const auto& p : mpm.particles()) {
             draw_list->AddCircleFilled(
-                ImVec2(origin.x + p.x.x() * canvas_width,
-                       origin.y + p.x.y() * canvas_width),
+                ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
+                       origin.y + static_cast<float>(p.x.y()) * canvas_width),
                 2, IM_COL32(6, 133, 135, 255));
         }
     } else {

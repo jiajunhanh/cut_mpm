@@ -16,6 +16,8 @@ class CutMesh {
     struct Edge;
     struct Face;
 
+    using Vec2 = std::conditional_t<std::is_same_v<Real, float>,
+                                    Eigen::Vector2f, Eigen::Vector2d>;
     using HalfEdgeRef = std::vector<HalfEdge>::iterator;
     using VertexRef = std::vector<Vertex>::iterator;
     using EdgeRef = std::vector<Edge>::iterator;
@@ -50,7 +52,7 @@ class CutMesh {
         HalfEdgeRef half_edge;
         int id{};
         int grid_id{};
-        Eigen::Vector2f position{};
+        Vec2 position{};
         std::array<bool, 2> on_edge{};
     };
 
@@ -98,5 +100,5 @@ class CutMesh {
     // std::stack<FaceRef> recycled_faces_;
 };
 
-CutMesh construct_cut_mesh(const std::vector<std::array<float, 2>>& vertices,
+CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
                            const std::vector<std::array<int, 2>>& edges);
