@@ -59,6 +59,8 @@ class CutMesh {
     struct Face {
         HalfEdgeRef half_edge;
         int id{};
+        [[nodiscard]] Vec2 center() const;
+        [[nodiscard]] bool enclose(Real x, Real y) const;
     };
 
     struct Grid {
@@ -71,11 +73,15 @@ class CutMesh {
     auto& edges() { return edges_; }
     auto& faces() { return faces_; }
     auto& grids() { return grids_; }
+    Grid& grid(int r, int c) { return grids_[r * kGridSize + c]; }
     [[nodiscard]] const auto& half_edges() const { return half_edges_; }
     [[nodiscard]] const auto& vertices() const { return vertices_; }
     [[nodiscard]] const auto& edges() const { return edges_; }
     [[nodiscard]] const auto& faces() const { return faces_; }
     [[nodiscard]] const auto& grids() const { return grids_; }
+    [[nodiscard]] const Grid& grid(int r, int c) const {
+        return grids_[r * kGridSize + c];
+    }
 
     HalfEdgeRef emplace_half_edge();
     VertexRef emplace_vertex();
@@ -86,6 +92,8 @@ class CutMesh {
     // void erase_vertex(VertexRef&& v);
     // void erase_edge(EdgeRef&& e);
     // void erase_face(FaceRef&& f);
+
+    [[nodiscard]] FaceRef get_enclosing_face(Real x, Real y) const;
 
    private:
     int next_id{};

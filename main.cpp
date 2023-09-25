@@ -416,7 +416,7 @@ static void show_cut_mesh() {
         ImVec2(main_viewport->WorkPos.x + 20, main_viewport->WorkPos.y + 20),
         ImGuiCond_FirstUseEver);
 
-    if (!ImGui::Begin("Cut-Cell")) {
+    if (!ImGui::Begin("Cut_MPM")) {
         ImGui::End();
         return;
     }
@@ -427,7 +427,7 @@ static void show_cut_mesh() {
         std::make_shared<CutMesh>(construct_cut_mesh(vertices, edges));
     static MPM mpm(cut_mesh);
     static bool opt_enable_grid = true;
-    static bool opt_construct_cut_mesh = false;
+    static bool opt_construct_cut_mesh = true;
     static bool opt_draw_cut_vertices = false;
     static bool opt_draw_cut_edges = false;
     static bool opt_draw_original_lines = true;
@@ -487,23 +487,22 @@ static void show_cut_mesh() {
     const ImVec2 origin(canvas_p0.x, canvas_p0.y);   // Lock scrolled origin
     const ImVec2 mouse_pos_in_canvas(io.MousePos.x - origin.x,
                                      io.MousePos.y - origin.y);
+    const std::array mouse_pos_in_grid{
+        std::clamp(Real{mouse_pos_in_canvas.x} / canvas_width, Real{0.0},
+                   Real{1.0} - std::numeric_limits<Real>::epsilon()),
+        std::clamp(Real{mouse_pos_in_canvas.y} / canvas_width, Real{0.0},
+                   Real{1.0} - std::numeric_limits<Real>::epsilon())};
 
-    if (is_hovered && !adding_line &&
+    if (opt_construct_cut_mesh && is_hovered && !adding_line &&
         ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         if (vertices.empty()) {
-            vertices.emplace_back(
-                std::array{Real{mouse_pos_in_canvas.x} / canvas_width,
-                           Real{mouse_pos_in_canvas.y} / canvas_width});
+            vertices.emplace_back(mouse_pos_in_grid);
         }
-        vertices.emplace_back(
-            std::array{Real{mouse_pos_in_canvas.x} / canvas_width,
-                       Real{mouse_pos_in_canvas.y} / canvas_width});
+        vertices.emplace_back(mouse_pos_in_grid);
         adding_line = true;
     }
     if (adding_line) {
-        vertices.back() =
-            std::array{Real{mouse_pos_in_canvas.x} / canvas_width,
-                       Real{mouse_pos_in_canvas.y} / canvas_width};
+        vertices.back() = mouse_pos_in_grid;
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) adding_line = false;
     }
 
@@ -524,13 +523,6 @@ static void show_cut_mesh() {
         ImGui::EndPopup();
     }
 
-    // Construct cut-mesh
-    for (auto& v : vertices) {
-        v[0] = std::clamp(Real{v[0]}, Real{0.0},
-                          Real{1.0} - std::numeric_limits<Real>::epsilon());
-        v[1] = std::clamp(Real{v[1]}, Real{0.0},
-                          Real{1.0} - std::numeric_limits<Real>::epsilon());
-    }
     if (opt_construct_cut_mesh) {
         edges.clear();
         for (int i = 0, size = static_cast<int>(vertices.size()); i < size;
@@ -625,9 +617,14 @@ static void show_cut_mesh() {
                 origin.x + static_cast<float>(v0->position.x()) * canvas_width,
                 origin.y + static_cast<float>(v0->position.y()) * canvas_width),
             ImVec2(
-                static_cast<float>(origin.x + v1->position.x()) * canvas_width,
-                static_cast<float>(origin.y + v1->position.y()) * canvas_width),
+                origin.x + static_cast<float>(v1->position.x()) * canvas_width,
+                origin.y + static_cast<float>(v1->position.y()) * canvas_width),
             IM_COL32(0, 0, 255, 255), 4.0f);
+        if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            auto face = cut_mesh->get_enclosing_face(mouse_pos_in_grid[0],
+                                                     mouse_pos_in_grid[1]);
+            std::cout << face->id << '\n';
+        }
     }
     if (opt_draw_cut_vertices) {
         for (const auto& v : cut_mesh->vertices()) {

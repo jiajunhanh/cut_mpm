@@ -4,7 +4,7 @@
 #include <cmath>
 #include <unordered_set>
 
-constexpr static int kGridNodesNumber = kGridRowSize * kGridRowSize;
+constexpr static int kGridNodesNumber = kRowSize * kRowSize;
 
 namespace {
 struct Vertex {
@@ -15,8 +15,6 @@ struct Vertex {
     [[nodiscard]] Real coord(int d) const {
         return static_cast<Real>(c[d]) + q[d];
     }
-
-    [[nodiscard]] int node_id() const { return c[1] * (kGridSize + 1) + c[0]; }
 };
 
 struct Edge {
@@ -49,11 +47,11 @@ static void add_grid_edges(std::vector<Vertex>& cut_vertices,
             }
         }
     }
-    for (int y = 0; y < kGridSize; ++y) {
-        for (int x = 0; x < kGridSize; ++x) {
-            int node_i = y * kGridRowSize + x;
+    for (int r = 0; r < kGridSize; ++r) {
+        for (int c = 0; c < kGridSize; ++c) {
+            int node_i = r * kRowSize + c;
             for (int d = 0; d < 2; ++d) {
-                auto& v = grid_cut_vertices[y * kGridSize + x][d];
+                auto& v = grid_cut_vertices[r * kGridSize + c][d];
                 int node_j = node_i + d * kGridSize + 1;
                 if (v.empty()) {
                     cut_edges.emplace_back(node_i, node_j);
@@ -72,10 +70,10 @@ static void add_grid_edges(std::vector<Vertex>& cut_vertices,
         }
     }
     for (int i = 0; i < kGridSize; ++i) {
-        cut_edges.emplace_back(i * kGridRowSize + kGridSize,
-                               (i + 1) * kGridRowSize + kGridSize);
-        cut_edges.emplace_back(kGridSize * kGridRowSize + i,
-                               kGridSize * kGridRowSize + i + 1);
+        cut_edges.emplace_back(i * kRowSize + kGridSize,
+                               (i + 1) * kRowSize + kGridSize);
+        cut_edges.emplace_back(kGridSize * kRowSize + i,
+                               kGridSize * kRowSize + i + 1);
     }
 }
 
@@ -84,11 +82,11 @@ compute_cut_vertices_and_edges(const std::vector<std::array<Real, 2>>& vertices,
                                const std::vector<std::array<int, 2>>& edges) {
     std::vector<Vertex> cut_vertices;
     std::vector<Edge> cut_edges;
-    for (int y = 0; y < kGridRowSize; ++y) {
-        for (int x = 0; x < kGridRowSize; ++x) {
+    for (int r = 0; r < kRowSize; ++r) {
+        for (int c = 0; c < kRowSize; ++c) {
             Vertex v{};
-            v.c[0] = x;
-            v.c[1] = y;
+            v.c[0] = c;
+            v.c[1] = r;
             v.b[0] = v.b[1] = true;
             cut_vertices.emplace_back(v);
         }
@@ -128,7 +126,8 @@ compute_cut_vertices_and_edges(const std::vector<std::array<Real, 2>>& vertices,
                 cut_v.q[d] = 0;
                 cut_v.b[d] = true;
                 if (cut_v.b[d ^ 1]) {
-                    intersection_points.emplace_back(t, cut_v.node_id());
+                    intersection_points.emplace_back(
+                        t, cut_v.c[1] * kRowSize * cut_v.c[0]);
                     continue;
                 }
                 cut_vertices.emplace_back(cut_v);
@@ -247,8 +246,10 @@ CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
     cut_mesh.grids().resize(kGridSize * kGridSize);
     for (auto face = begin(cut_mesh.faces()), faces_end = end(cut_mesh.faces());
          face != faces_end; ++face) {
-        int grid_id = face->half_edge->vertex->grid_id;
-        cut_mesh.grids()[grid_id].faces.emplace_back(face);
+        CutMesh::Vec2 center = face->center() * kGridSize;
+        int r = static_cast<int>(std::floor(center.y()));
+        int c = static_cast<int>(std::floor(center.x()));
+        cut_mesh.grid(r, c).faces.emplace_back(face);
         auto half_edge = face->half_edge;
         auto h = half_edge;
         do {
@@ -257,12 +258,33 @@ CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
         } while (h != half_edge);
     }
 
-    for (int y = 0; y < kGridSize; ++y) {
-        for (int x = 0; x < kGridSize; ++x) {
-            cut_mesh.grids()[y * kGridSize + x].vertex =
-                mesh_vertices[y * kGridRowSize + x];
+    for (int r = 0; r < kGridSize; ++r) {
+        for (int c = 0; c < kGridSize; ++c) {
+            cut_mesh.grid(r, c).vertex = mesh_vertices[r * kRowSize + c];
         }
     }
 
     return cut_mesh;
+}
+
+CutMesh::FaceRef CutMesh::get_enclosing_face(Real x, Real y) const {
+    auto r = static_cast<int>(std::floor(y * kGridSize));
+    auto c = static_cast<int>(std::floor(x * kGridSize));
+    for (const auto& face : grid(r, c).faces) {
+        if (face->enclose(x, y)) return face;
+    }
+    assert(false && "Point must be in a face!");
+    return grid(r, c).faces[0];
+}
+
+CutMesh::Vec2 CutMesh::Face::center() const {
+    Vec2 res = Vec2::Zero();
+    int cnt = 0;
+    auto h = half_edge;
+    do {
+        res += h->vertex->position;
+        ++cnt;
+        h = h->next;
+    } while (h != half_edge);
+    return res / cnt;
 }

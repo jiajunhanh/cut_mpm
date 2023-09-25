@@ -45,5 +45,5 @@ class MPM {
    private:
     std::shared_ptr<CutMesh> cut_mesh_;
     std::vector<Particle> particles_;
-    std::vector<GridNode> grid_nodes_;
+    std::vector<GridNode> nodes_;
 };

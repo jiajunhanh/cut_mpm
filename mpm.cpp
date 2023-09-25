@@ -37,10 +37,10 @@ static auto svd(const MPM::Mat2& m) {
 
 MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh_) : cut_mesh_(cut_mesh_) {
     int n_vertices = static_cast<int>(cut_mesh_->vertices().size());
-    grid_nodes_.resize(n_vertices);
+    nodes_.resize(n_vertices);
     for (auto [i, v] = std::tuple(0, begin(cut_mesh_->vertices()));
          i < n_vertices; ++i, ++v) {
-        grid_nodes_[i].vertex = v;
+        nodes_[i].vertex = v;
     }
 }
 
@@ -54,7 +54,7 @@ void MPM::initialize() {
 }
 
 void MPM::update() {
-    for (GridNode& g : grid_nodes_) {
+    for (GridNode& g : nodes_) {
         g.m = 0.0;
         g.v.setZero();
     }
@@ -97,17 +97,17 @@ void MPM::update() {
                 distance *= kDeltaX;
                 int x = base.x() + i;
                 int y = base.y() + j;
-                GridNode& g = grid_nodes_[y * kGridRowSize + x];
+                GridNode& g = nodes_[y * kRowSize + x];
                 g.v += weight * affine * distance;
                 g.m += weight * kParticleMass;
             }
         }
     }
     // Grid update
-    for (GridNode& g : grid_nodes_) {
+    for (GridNode& g : nodes_) {
         int id = g.vertex->id;
-        int x = id % kGridRowSize;
-        int y = id / kGridRowSize;
+        int x = id % kRowSize;
+        int y = id / kRowSize;
         if (g.m <= 0.0) continue;
         g.v /= g.m;
         g.v += kDeltaT * kGravity * 30.0;
@@ -142,7 +142,7 @@ void MPM::update() {
                 distance *= kDeltaX;
                 int x = base.x() + i;
                 int y = base.y() + j;
-                const GridNode& g = grid_nodes_[y * kGridRowSize + x];
+                const GridNode& g = nodes_[y * kRowSize + x];
                 new_v += weight * g.v;
                 new_C += weight * (g.v * distance.transpose());
                 new_M += weight * distance * distance.transpose();

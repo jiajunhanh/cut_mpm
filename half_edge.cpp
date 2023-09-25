@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "cut_mesh.h"
 
 CutMesh::HalfEdgeRef CutMesh::emplace_half_edge() {
@@ -54,6 +56,23 @@ CutMesh::FaceRef CutMesh::emplace_face() {
     f->half_edge = half_edges_.end();
     f->id = next_id++;
     return f;
+}
+
+bool CutMesh::Face::enclose(Real x, Real y) const {
+    Real winding_number = 0.0;
+    auto h = half_edge;
+    Vec2 center(x, y);
+    do {
+        auto v0 = h->vertex;
+        auto v1 = h->twin->vertex;
+        auto a = v0->position - center;
+        auto b = v1->position - center;
+        winding_number += std::atan2(a.x() * b.y() - a.y() * b.x(),
+                                     a.x() * b.x() + a.y() * b.y());
+        h = h->next;
+    } while (h != half_edge);
+    return std::abs(winding_number) >
+           std::numeric_limits<Real>::epsilon() * 1e4;
 }
 
 // void CutMesh::CutMesh::erase_half_edge(HalfEdgeRef&& h) {
