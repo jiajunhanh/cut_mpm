@@ -2,9 +2,18 @@
 
 #include <algorithm>
 #include <cmath>
+#include <random>
 #include <unordered_set>
 
 constexpr static int kGridNodesNumber = kRowSize * kRowSize;
+
+static Real random_real() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    // static std::mt19937 gen(42);
+    static std::uniform_real_distribution<Real> dis(0.0, 1.0);
+    return dis(gen);
+}
 
 namespace {
 struct Vertex {
@@ -268,13 +277,17 @@ CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
 }
 
 CutMesh::FaceRef CutMesh::get_enclosing_face(Real x, Real y) const {
-    auto r = static_cast<int>(std::floor(y * kGridSize));
-    auto c = static_cast<int>(std::floor(x * kGridSize));
-    for (const auto& face : grid(r, c).faces) {
-        if (face->enclose(x, y)) return face;
+    while (true) {
+        auto r = static_cast<int>(std::floor(y * kGridSize));
+        auto c = static_cast<int>(std::floor(x * kGridSize));
+        for (const auto& face : grid(r, c).faces) {
+            if (face->enclose(x, y)) return face;
+        }
+        x += (random_real() * 10 - 5) * std::numeric_limits<Real>::epsilon();
+        y += (random_real() * 10 - 5) * std::numeric_limits<Real>::epsilon();
     }
-    assert(false && "Point must be in a face!");
-    return grid(r, c).faces[0];
+    // assert(false && "Point must be in a face!");
+    // return grid(r, c).faces[0];
 }
 
 CutMesh::Vec2 CutMesh::Face::center() const {

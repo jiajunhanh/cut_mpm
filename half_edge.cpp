@@ -71,8 +71,8 @@ bool CutMesh::Face::enclose(Real x, Real y) const {
                                      a.x() * b.x() + a.y() * b.y());
         h = h->next;
     } while (h != half_edge);
-    return std::abs(winding_number) >
-           std::numeric_limits<Real>::epsilon() * 1e4;
+    // std::cerr << winding_number << '\n';
+    return winding_number > std::numeric_limits<Real>::epsilon() * 1e4;
 }
 
 // void CutMesh::CutMesh::erase_half_edge(HalfEdgeRef&& h) {

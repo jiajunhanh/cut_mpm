@@ -434,7 +434,8 @@ static void show_cut_mesh() {
     static bool opt_simulation = false;
     static bool adding_line = false;
     static bool simulating = false;
-    static auto selected_half_edge = cut_mesh->half_edges().end();
+    static auto selected_half_edge = end(cut_mesh->half_edges());
+    static auto selected_face = end(cut_mesh->faces());
 
     ImGui::Checkbox("Enable grid", &opt_enable_grid);
     ImGui::Checkbox("Construct cut-mesh", &opt_construct_cut_mesh);
@@ -443,7 +444,7 @@ static void show_cut_mesh() {
     ImGui::Checkbox("Draw original lines", &opt_draw_original_lines);
 
     if (!opt_construct_cut_mesh &&
-        selected_half_edge != cut_mesh->half_edges().end()) {
+        selected_half_edge != end(cut_mesh->half_edges())) {
         ImGui::SameLine();
         if (ImGui::Button("Next")) {
             selected_half_edge = selected_half_edge->next;
@@ -460,7 +461,8 @@ static void show_cut_mesh() {
     }
     if (ImGui::Button("Clear cut-mesh")) {
         cut_mesh = std::make_shared<CutMesh>();
-        selected_half_edge = cut_mesh->half_edges().end();
+        selected_half_edge = end(cut_mesh->half_edges());
+        selected_face = end(cut_mesh->faces());
     }
     ImGui::Text(
         "Mouse Left: drag to add lines,\nMouse Right: click for context menu.");
@@ -532,6 +534,7 @@ static void show_cut_mesh() {
         }
         *cut_mesh = construct_cut_mesh(vertices, edges);
         selected_half_edge = cut_mesh->half_edges().begin();
+        selected_face = end(cut_mesh->faces());
     }
 
     // Draw grid + all lines in the canvas
@@ -623,7 +626,7 @@ static void show_cut_mesh() {
         if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             auto face = cut_mesh->get_enclosing_face(mouse_pos_in_grid[0],
                                                      mouse_pos_in_grid[1]);
-            std::cout << face->id << '\n';
+            selected_half_edge = face->half_edge;
         }
     }
     if (opt_draw_cut_vertices) {
