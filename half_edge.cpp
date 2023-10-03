@@ -58,15 +58,14 @@ CutMesh::FaceRef CutMesh::emplace_face() {
     return f;
 }
 
-bool CutMesh::Face::enclose(Real x, Real y) const {
+bool CutMesh::Face::enclose(const Vec2& x) const {
     Real winding_number = 0.0;
     auto h = half_edge;
-    Vec2 center(x, y);
     do {
         auto v0 = h->vertex;
         auto v1 = h->twin->vertex;
-        auto a = v0->position - center;
-        auto b = v1->position - center;
+        Vec2 a = v0->position - x;
+        Vec2 b = v1->position - x;
         winding_number += std::atan2(a.x() * b.y() - a.y() * b.x(),
                                      a.x() * b.x() + a.y() * b.y());
         h = h->next;

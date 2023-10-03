@@ -1,7 +1,9 @@
 #include "mpm.h"
 
 #include <Eigen/SVD>
+#include <queue>
 #include <random>
+#include <unordered_set>
 
 constexpr Real kParticleVolume = kDeltaX * kDeltaX * 0.25;
 constexpr Real kParticleDensity = 1.0;
@@ -11,7 +13,7 @@ constexpr Real kPoissonRatio = 0.2;
 constexpr Real kMu0 = kYoungModulus / (2.0 * (1.0 + kPoissonRatio));
 constexpr Real kLambda0 = kYoungModulus * kPoissonRatio /
                           ((1.0 + kPoissonRatio) * (1.0 - 2.0 * kPoissonRatio));
-const MPM::Vec2 kGravity(0.0, 1.0);
+const Vec2 kGravity(0.0, 1.0);
 
 static Real random_real() {
     static std::random_device rd;
@@ -29,9 +31,12 @@ static Real interpolate(Real x) {
     return std::max(Real{0.0}, Real{0.75} - Real{0.5} * x);
 }
 
-static auto svd(const MPM::Mat2& m) {
-    Eigen::JacobiSVD<MPM::Mat2, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(
-        m);
+static Real interpolate(Vec2 x) {
+    return interpolate(x.x()) * interpolate(x.y());
+}
+
+static auto svd(const Mat2& m) {
+    Eigen::JacobiSVD<Mat2, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(m);
     return std::tuple{svd.matrixU(), svd.singularValues(), svd.matrixV()};
 }
 
@@ -41,6 +46,7 @@ MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh_) : cut_mesh_(cut_mesh_) {
     for (auto [i, v] = std::tuple(0, begin(cut_mesh_->vertices()));
          i < n_vertices; ++i, ++v) {
         nodes_[i].vertex = v;
+        node_of_vertex_[v->id] = i;
     }
 }
 
@@ -60,8 +66,6 @@ void MPM::update() {
     }
     // P2G
     for (Particle& p : particles_) {
-        Vec2i base = ((p.x * kInvDeltaX).array() - 0.5).cast<int>();
-        Vec2 fx = p.x * kInvDeltaX - base.cast<Real>();
         p.F = (Mat2::Identity() + kDeltaT * p.C.block<2, 2>(0, 1)) * p.F;
         Real hardening_coefficient = 1.0;
         Real mu = kMu0 * hardening_coefficient;
@@ -78,29 +82,26 @@ void MPM::update() {
         }
         affine *= -kDeltaT * kParticleVolume;
         affine += kParticleMass * p.C;
+        auto neighbor_nodes = get_neighbor_nodes(p.x);
+        int n_neighbor_nodes = static_cast<int>(neighbor_nodes.size());
         Real weight_sum = 0.0;
-        Real weights[3][3];
-        for (int i = 0; i < 3; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                Vec2i offset(i, j);
-                Vec2 distance = (offset.cast<Real>() - fx);
-                weights[i][j] =
-                    interpolate(distance.x()) * interpolate(distance.y());
-                weight_sum += weights[i][j];
-            }
+        std::vector<Real> weights(n_neighbor_nodes);
+        for (int i = 0; i < n_neighbor_nodes; ++i) {
+            weights[i] = interpolate(
+                (nodes_[neighbor_nodes[i]].vertex->position - p.x) * kGridSize);
+            weight_sum += weights[i];
         }
-        for (int i = 0; i < 3; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                Vec3 distance(1.0, static_cast<Real>(i) - fx.x(),
-                              static_cast<Real>(j) - fx.y());
-                Real weight = weights[i][j] / weight_sum;
-                distance *= kDeltaX;
-                int x = base.x() + i;
-                int y = base.y() + j;
-                GridNode& g = nodes_[y * kRowSize + x];
-                g.v += weight * affine * distance;
-                g.m += weight * kParticleMass;
-            }
+        for (int i = 0; i < n_neighbor_nodes; ++i) {
+            auto& g = nodes_[neighbor_nodes[i]];
+            auto node_position = g.vertex->position;
+            Vec3 distance(0.0, node_position.x() - p.x.x(),
+                          node_position.y() - p.x.y());
+            distance *= kGridSize;
+            distance.x() = 1.0;
+            Real weight = weights[i] / weight_sum;
+            distance *= kDeltaX;
+            g.v += weight * affine * distance;
+            g.m += weight * kParticleMass;
         }
     }
     // Grid update
@@ -108,49 +109,77 @@ void MPM::update() {
         int id = g.vertex->id;
         int x = id % kRowSize;
         int y = id / kRowSize;
-        if (g.m <= 0.0) continue;
+        if (g.m <= 0) continue;
         g.v /= g.m;
-        g.v += kDeltaT * kGravity * 30.0;
-        if (x < 3 && g.v[0] < 0.0) g.v[0] = 0.0;
-        if (x > kGridSize - 3 && g.v[0] > 0.0) g.v[0] = 0.0;
-        if (y < 3 && g.v[1] < 0.0) g.v[1] = 0.0;
-        if (y > kGridSize - 3 && g.v[1] > 0.0) g.v[1] = 0.0;
+        g.v += kDeltaT * kGravity * 30;
+        if (g.vertex->id >= kRowSize * kRowSize) continue;
+        if (x < 3 && g.v[0] < 0) g.v[0] = 0;
+        if (x > kGridSize - 3 && g.v[0] > 0.0) g.v[0] = 0;
+        if (y < 3 && g.v[1] < 0) g.v[1] = 0;
+        if (y > kGridSize - 3 && g.v[1] > 0) g.v[1] = 0;
     }
     // G2P
     for (Particle& p : particles_) {
-        Vec2i base = ((p.x * kInvDeltaX).array() - 0.5).cast<int>();
-        Vec2 fx = p.x * kInvDeltaX - base.cast<Real>();
+        auto neighbor_nodes = get_neighbor_nodes(p.x);
+        int n_neighbor_nodes = static_cast<int>(neighbor_nodes.size());
         Real weight_sum = 0.0;
-        Real weights[3][3];
-        for (int i = 0; i < 3; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                Vec2i offset(i, j);
-                Vec2 distance = (offset.cast<Real>() - fx);
-                weights[i][j] =
-                    interpolate(distance.x()) * interpolate(distance.y());
-                weight_sum += weights[i][j];
-            }
+        std::vector<Real> weights(n_neighbor_nodes);
+        for (int i = 0; i < n_neighbor_nodes; ++i) {
+            weights[i] = interpolate(
+                (nodes_[neighbor_nodes[i]].vertex->position - p.x) * kGridSize);
+            weight_sum += weights[i];
         }
         Vec2 new_v = Vec2::Zero();
         Mat23 new_C = Mat23::Zero();
         Mat3 new_M = Mat3::Zero();
-        for (int i = 0; i < 3; ++i) {
-            for (int j = 0; j < 3; ++j) {
-                Vec3 distance(1.0, static_cast<Real>(i) - fx.x(),
-                              static_cast<Real>(j) - fx.y());
-                Real weight = weights[i][j] / weight_sum;
-                distance *= kDeltaX;
-                int x = base.x() + i;
-                int y = base.y() + j;
-                const GridNode& g = nodes_[y * kRowSize + x];
-                new_v += weight * g.v;
-                new_C += weight * (g.v * distance.transpose());
-                new_M += weight * distance * distance.transpose();
-            }
+        for (int i = 0; i < n_neighbor_nodes; ++i) {
+            auto& g = nodes_[neighbor_nodes[i]];
+            auto node_position = g.vertex->position;
+            Vec3 distance(0.0, node_position.x() - p.x.x(),
+                          node_position.y() - p.x.y());
+            distance *= kGridSize;
+            distance.x() = 1.0;
+            Real weight = weights[i] / weight_sum;
+            distance *= kDeltaX;
+            new_v += weight * g.v;
+            new_C += weight * (g.v * distance.transpose());
+            new_M += weight * distance * distance.transpose();
         }
         p.v = new_v;
         p.M_inv = new_M.inverse();
         p.C = new_C * new_M.inverse();
         p.x += kDeltaT * p.v;
     }
+}
+
+std::vector<int> MPM::get_neighbor_nodes(const Vec2& x) const {
+    auto enclosing_face = cut_mesh_->get_enclosing_face(x);
+    std::unordered_set<int> visited_faces;
+    std::vector<CutMesh::FaceRef> neighbor_faces;
+    std::queue<CutMesh::FaceRef> face_queue;
+    face_queue.emplace(enclosing_face);
+    while (!face_queue.empty()) {
+        auto face = face_queue.front();
+        face_queue.pop();
+        if (visited_faces.count(face->id)) continue;
+        visited_faces.emplace(face->id);
+        neighbor_faces.emplace_back(face);
+        auto h = face->half_edge;
+        do {
+            auto f = h->twin->face;
+            if (visited_faces.count(f->id)) continue;
+            if (interpolate((f->center() - x) * kGridSize) <= 0) continue;
+            face_queue.emplace(f);
+        } while ((h = h->next) != face->half_edge);
+    }
+    std::unordered_set<int> neighbor_nodes;
+    for (auto f : neighbor_faces) {
+        auto h = f->half_edge;
+        do {
+            if (interpolate(((h->vertex->position - x) * kGridSize)) <= 0)
+                continue;
+            neighbor_nodes.emplace(node_of_vertex_.at(h->vertex->id));
+        } while ((h = h->next) != f->half_edge);
+    }
+    return {cbegin(neighbor_nodes), cend(neighbor_nodes)};
 }

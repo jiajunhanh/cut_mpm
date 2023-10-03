@@ -16,8 +16,6 @@ class CutMesh {
     struct Edge;
     struct Face;
 
-    using Vec2 = std::conditional_t<std::is_same_v<Real, float>,
-                                    Eigen::Vector2f, Eigen::Vector2d>;
     using HalfEdgeRef = std::vector<HalfEdge>::iterator;
     using VertexRef = std::vector<Vertex>::iterator;
     using EdgeRef = std::vector<Edge>::iterator;
@@ -60,7 +58,7 @@ class CutMesh {
         HalfEdgeRef half_edge;
         int id{};
         [[nodiscard]] Vec2 center() const;
-        [[nodiscard]] bool enclose(Real x, Real y) const;
+        [[nodiscard]] bool enclose(const Vec2& x) const;
     };
 
     struct Grid {
@@ -93,7 +91,7 @@ class CutMesh {
     // void erase_edge(EdgeRef&& e);
     // void erase_face(FaceRef&& f);
 
-    [[nodiscard]] FaceRef get_enclosing_face(Real x, Real y) const;
+    [[nodiscard]] FaceRef get_enclosing_face(Vec2 center) const;
 
    private:
     int next_id{};

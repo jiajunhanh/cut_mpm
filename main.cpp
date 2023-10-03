@@ -624,8 +624,8 @@ static void show_cut_mesh() {
                 origin.y + static_cast<float>(v1->position.y()) * canvas_width),
             IM_COL32(0, 0, 255, 255), 4.0f);
         if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-            auto face = cut_mesh->get_enclosing_face(mouse_pos_in_grid[0],
-                                                     mouse_pos_in_grid[1]);
+            auto face = cut_mesh->get_enclosing_face(
+                {mouse_pos_in_grid[0], mouse_pos_in_grid[1]});
             selected_half_edge = face->half_edge;
         }
     }

@@ -6,7 +6,7 @@
 #include <unordered_set>
 
 constexpr static int kGridNodesNumber = kRowSize * kRowSize;
-
+/*
 static Real random_real() {
     static std::random_device rd;
     static std::mt19937 gen(rd());
@@ -14,7 +14,7 @@ static Real random_real() {
     static std::uniform_real_distribution<Real> dis(0.0, 1.0);
     return dis(gen);
 }
-
+*/
 namespace {
 struct Vertex {
     int c[2] = {};
@@ -255,7 +255,7 @@ CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
     cut_mesh.grids().resize(kGridSize * kGridSize);
     for (auto face = begin(cut_mesh.faces()), faces_end = end(cut_mesh.faces());
          face != faces_end; ++face) {
-        CutMesh::Vec2 center = face->center() * kGridSize;
+        Vec2 center = face->center() * kGridSize;
         int r = static_cast<int>(std::floor(center.y()));
         int c = static_cast<int>(std::floor(center.x()));
         cut_mesh.grid(r, c).faces.emplace_back(face);
@@ -276,21 +276,20 @@ CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
     return cut_mesh;
 }
 
-CutMesh::FaceRef CutMesh::get_enclosing_face(Real x, Real y) const {
+CutMesh::FaceRef CutMesh::get_enclosing_face(Vec2 x) const {
     while (true) {
-        auto r = static_cast<int>(std::floor(y * kGridSize));
-        auto c = static_cast<int>(std::floor(x * kGridSize));
+        auto r = static_cast<int>(std::floor(x.y() * kGridSize));
+        auto c = static_cast<int>(std::floor(x.x() * kGridSize));
         for (const auto& face : grid(r, c).faces) {
-            if (face->enclose(x, y)) return face;
+            if (face->enclose(x)) return face;
         }
-        x += (random_real() * 10 - 5) * std::numeric_limits<Real>::epsilon();
-        y += (random_real() * 10 - 5) * std::numeric_limits<Real>::epsilon();
+        x += Vec2::Random() * 10;
     }
     // assert(false && "Point must be in a face!");
     // return grid(r, c).faces[0];
 }
 
-CutMesh::Vec2 CutMesh::Face::center() const {
+Vec2 CutMesh::Face::center() const {
     Vec2 res = Vec2::Zero();
     int cnt = 0;
     auto h = half_edge;
