@@ -15,7 +15,7 @@ CutMesh::HalfEdgeRef CutMesh::emplace_half_edge() {
     h->edge = edges_.end();
     h->vertex = vertices_.end();
     h->face = faces_.end();
-    h->id = next_id++;
+    h->id = static_cast<int>(half_edges_.size()) - 1;
     return h;
 }
 
@@ -28,7 +28,7 @@ CutMesh::VertexRef CutMesh::emplace_vertex() {
     //        recycled_vertices_.pop();
     //    }
     v->half_edge = half_edges_.end();
-    v->id = next_id++;
+    v->id = static_cast<int>(vertices_.size()) - 1;
     return v;
 }
 
@@ -41,7 +41,7 @@ CutMesh::EdgeRef CutMesh::emplace_edge() {
     //        recycled_edges_.pop();
     //    }
     e->half_edge = half_edges_.end();
-    e->id = next_id++;
+    e->id = static_cast<int>(edges_.size()) - 1;
     return e;
 }
 
@@ -54,7 +54,7 @@ CutMesh::FaceRef CutMesh::emplace_face() {
     //        recycled_faces_.pop();
     //    }
     f->half_edge = half_edges_.end();
-    f->id = next_id++;
+    f->id = static_cast<int>(faces_.size());
     return f;
 }
 

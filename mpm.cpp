@@ -3,7 +3,6 @@
 #include <Eigen/SVD>
 #include <queue>
 #include <random>
-#include <unordered_set>
 
 constexpr Real kParticleVolume = kDeltaX * kDeltaX * 0.25;
 constexpr Real kParticleDensity = 1.0;
@@ -154,32 +153,35 @@ void MPM::update() {
 
 std::vector<int> MPM::get_neighbor_nodes(const Vec2& x) const {
     auto enclosing_face = cut_mesh_->get_enclosing_face(x);
-    std::unordered_set<int> visited_faces;
+    std::vector<bool> face_visited(cut_mesh_->faces().size());
+    std::vector<bool> is_neighbor_node(cut_mesh_->vertices().size());
     std::vector<CutMesh::FaceRef> neighbor_faces;
     std::queue<CutMesh::FaceRef> face_queue;
     face_queue.emplace(enclosing_face);
     while (!face_queue.empty()) {
         auto face = face_queue.front();
         face_queue.pop();
-        if (visited_faces.count(face->id)) continue;
-        visited_faces.emplace(face->id);
+        if (face_visited[face->id]) continue;
+        face_visited[face->id] = true;
         neighbor_faces.emplace_back(face);
         auto h = face->half_edge;
         do {
             auto f = h->twin->face;
-            if (visited_faces.count(f->id)) continue;
+            if (face_visited[f->id]) continue;
             if (interpolate((f->center() - x) * kGridSize) <= 0) continue;
             face_queue.emplace(f);
         } while ((h = h->next) != face->half_edge);
     }
-    std::unordered_set<int> neighbor_nodes;
+    std::vector<int> neighbor_nodes;
     for (auto f : neighbor_faces) {
         auto h = f->half_edge;
         do {
+            if (is_neighbor_node[h->vertex->id]) continue;
             if (interpolate(((h->vertex->position - x) * kGridSize)) <= 0)
                 continue;
-            neighbor_nodes.emplace(node_of_vertex_.at(h->vertex->id));
+            is_neighbor_node[h->vertex->id] = true;
+            neighbor_nodes.emplace_back(node_of_vertex_.at(h->vertex->id));
         } while ((h = h->next) != f->half_edge);
     }
-    return {cbegin(neighbor_nodes), cend(neighbor_nodes)};
+    return neighbor_nodes;
 }

@@ -283,7 +283,7 @@ CutMesh::FaceRef CutMesh::get_enclosing_face(Vec2 x) const {
         for (const auto& face : grid(r, c).faces) {
             if (face->enclose(x)) return face;
         }
-        x += Vec2::Random() * 10;
+        x += Vec2::Random() * 10 * std::numeric_limits<Real>::epsilon();
     }
     // assert(false && "Point must be in a face!");
     // return grid(r, c).faces[0];
@@ -296,7 +296,6 @@ Vec2 CutMesh::Face::center() const {
     do {
         res += h->vertex->position;
         ++cnt;
-        h = h->next;
-    } while (h != half_edge);
+    } while ((h = h->next) != half_edge);
     return res / cnt;
 }

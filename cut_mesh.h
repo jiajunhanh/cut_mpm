@@ -94,7 +94,6 @@ class CutMesh {
     [[nodiscard]] FaceRef get_enclosing_face(Vec2 center) const;
 
    private:
-    int next_id{};
     std::vector<HalfEdge> half_edges_;
     std::vector<Vertex> vertices_;
     std::vector<Edge> edges_;
