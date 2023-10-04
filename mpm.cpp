@@ -1,7 +1,6 @@
 #include "mpm.h"
 
 #include <Eigen/SVD>
-#include <queue>
 #include <random>
 
 constexpr Real kParticleVolume = kDeltaX * kDeltaX * 0.25;
@@ -39,7 +38,10 @@ static auto svd(const Mat2& m) {
     return std::tuple{svd.matrixU(), svd.singularValues(), svd.matrixV()};
 }
 
-MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh_) : cut_mesh_(cut_mesh_) {
+MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh_)
+    : cut_mesh_(cut_mesh_),
+      face_visited_(cut_mesh_->faces().size()),
+      is_neighbor_node_(cut_mesh_->vertices().size()) {
     int n_vertices = static_cast<int>(cut_mesh_->vertices().size());
     nodes_.resize(n_vertices);
     for (auto [i, v] = std::tuple(0, begin(cut_mesh_->vertices()));
@@ -64,6 +66,7 @@ void MPM::update() {
         g.v.setZero();
     }
     // P2G
+    std::vector<int> neighbor_nodes;
     for (Particle& p : particles_) {
         p.F = (Mat2::Identity() + kDeltaT * p.C.block<2, 2>(0, 1)) * p.F;
         Real hardening_coefficient = 1.0;
@@ -81,7 +84,8 @@ void MPM::update() {
         }
         affine *= -kDeltaT * kParticleVolume;
         affine += kParticleMass * p.C;
-        auto neighbor_nodes = get_neighbor_nodes(p.x);
+        // auto neighbor_nodes = get_neighbor_nodes(p.x);
+        get_neighbor_nodes_in_place(p.x, neighbor_nodes);
         int n_neighbor_nodes = static_cast<int>(neighbor_nodes.size());
         Real weight_sum = 0.0;
         std::vector<Real> weights(n_neighbor_nodes);
@@ -112,14 +116,17 @@ void MPM::update() {
         g.v /= g.m;
         g.v += kDeltaT * kGravity * 30;
         if (g.vertex->id >= kRowSize * kRowSize) continue;
+        // if (g.vertex->id >= kRowSize * kRowSize)
+        //    g.v[0] = std::max(Real{0}, g.v[0]);
         if (x < 3 && g.v[0] < 0) g.v[0] = 0;
-        if (x > kGridSize - 3 && g.v[0] > 0.0) g.v[0] = 0;
+        if (x > kGridSize - 3 && g.v[0] > 0) g.v[0] = 0;
         if (y < 3 && g.v[1] < 0) g.v[1] = 0;
         if (y > kGridSize - 3 && g.v[1] > 0) g.v[1] = 0;
     }
     // G2P
     for (Particle& p : particles_) {
-        auto neighbor_nodes = get_neighbor_nodes(p.x);
+        // auto neighbor_nodes = get_neighbor_nodes(p.x);
+        get_neighbor_nodes_in_place(p.x, neighbor_nodes);
         int n_neighbor_nodes = static_cast<int>(neighbor_nodes.size());
         Real weight_sum = 0.0;
         std::vector<Real> weights(n_neighbor_nodes);
@@ -151,37 +158,42 @@ void MPM::update() {
     }
 }
 
-std::vector<int> MPM::get_neighbor_nodes(const Vec2& x) const {
+std::vector<int> MPM::get_neighbor_nodes(const Vec2& x) {
+    std::vector<int> neighbor_nodes;
+    get_neighbor_nodes_in_place(x, neighbor_nodes);
+    return neighbor_nodes;
+}
+
+void MPM::get_neighbor_nodes_in_place(const Vec2& x,
+                                      std::vector<int>& neighbor_nodes) {
+    neighbor_nodes.clear();
     auto enclosing_face = cut_mesh_->get_enclosing_face(x);
-    std::vector<bool> face_visited(cut_mesh_->faces().size());
-    std::vector<bool> is_neighbor_node(cut_mesh_->vertices().size());
-    std::vector<CutMesh::FaceRef> neighbor_faces;
-    std::queue<CutMesh::FaceRef> face_queue;
-    face_queue.emplace(enclosing_face);
-    while (!face_queue.empty()) {
-        auto face = face_queue.front();
-        face_queue.pop();
-        if (face_visited[face->id]) continue;
-        face_visited[face->id] = true;
-        neighbor_faces.emplace_back(face);
+    face_queue_.emplace(enclosing_face);
+    while (!face_queue_.empty()) {
+        auto face = face_queue_.front();
+        face_queue_.pop();
+        if (face_visited_[face->id]) continue;
+        face_visited_[face->id] = true;
+        neighbor_faces_.emplace_back(face);
         auto h = face->half_edge;
         do {
             auto f = h->twin->face;
-            if (face_visited[f->id]) continue;
+            if (face_visited_[f->id]) continue;
             if (interpolate((f->center() - x) * kGridSize) <= 0) continue;
-            face_queue.emplace(f);
+            face_queue_.emplace(f);
         } while ((h = h->next) != face->half_edge);
     }
-    std::vector<int> neighbor_nodes;
-    for (auto f : neighbor_faces) {
+    for (auto f : neighbor_faces_) {
         auto h = f->half_edge;
         do {
-            if (is_neighbor_node[h->vertex->id]) continue;
+            if (is_neighbor_node_[h->vertex->id]) continue;
             if (interpolate(((h->vertex->position - x) * kGridSize)) <= 0)
                 continue;
-            is_neighbor_node[h->vertex->id] = true;
+            is_neighbor_node_[h->vertex->id] = true;
             neighbor_nodes.emplace_back(node_of_vertex_.at(h->vertex->id));
         } while ((h = h->next) != f->half_edge);
     }
-    return neighbor_nodes;
+    std::fill(begin(face_visited_), end(face_visited_), false);
+    std::fill(begin(is_neighbor_node_), end(is_neighbor_node_), false);
+    neighbor_faces_.clear();
 }
