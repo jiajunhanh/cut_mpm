@@ -179,7 +179,7 @@ void MPM::get_neighbor_nodes_in_place(const Vec2& x,
         do {
             auto f = h->twin->face;
             if (face_visited_[f->id]) continue;
-            if (interpolate((f->center() - x) * kGridSize) <= 0) continue;
+            if (interpolate((f->center - x) * kGridSize) <= 0) continue;
             face_queue_.emplace(f);
         } while ((h = h->next) != face->half_edge);
     }

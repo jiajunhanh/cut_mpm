@@ -2,12 +2,10 @@
 #include <SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
-#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>   // printf, fprintf
 #include <cstdlib>  // abort
-#include <iostream>
 #include <memory>
 #include <vector>
 

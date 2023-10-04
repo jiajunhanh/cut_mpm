@@ -68,8 +68,7 @@ bool CutMesh::Face::enclose(const Vec2& x) const {
         Vec2 b = v1->position - x;
         winding_number += std::atan2(a.x() * b.y() - a.y() * b.x(),
                                      a.x() * b.x() + a.y() * b.y());
-        h = h->next;
-    } while (h != half_edge);
+    } while ((h = h->next) != half_edge);
     // std::cerr << winding_number << '\n';
     return winding_number > std::numeric_limits<Real>::epsilon() * 1e4;
 }

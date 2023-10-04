@@ -21,8 +21,8 @@ class MPM {
     struct GridNode {
         Real m = 0.0;
         Vec2 v = Vec2::Zero();
-        CutMesh::VertexRef vertex{};
-        std::vector<CutMesh::FaceRef> faces{};
+        CutMesh::VertexRef vertex;
+        std::vector<CutMesh::FaceRef> faces;
     };
 
     explicit MPM(const std::shared_ptr<CutMesh>& cut_mesh_);

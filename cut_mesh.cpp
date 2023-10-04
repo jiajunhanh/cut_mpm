@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <random>
 #include <unordered_set>
 
 constexpr static int kGridNodesNumber = kRowSize * kRowSize;
@@ -248,14 +247,14 @@ CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
         auto h = half_edge;
         do {
             visited_half_edges.emplace(h->id);
-            h = h->next;
-        } while (h != half_edge);
+        } while ((h = h->next) != half_edge);
     }
 
     cut_mesh.grids().resize(kGridSize * kGridSize);
     for (auto face = begin(cut_mesh.faces()), faces_end = end(cut_mesh.faces());
          face != faces_end; ++face) {
-        Vec2 center = face->center() * kGridSize;
+        face->calculate_center();
+        Vec2 center = face->center * kGridSize;
         int r = static_cast<int>(std::floor(center.y()));
         int c = static_cast<int>(std::floor(center.x()));
         cut_mesh.grid(r, c).faces.emplace_back(face);
@@ -263,8 +262,7 @@ CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
         auto h = half_edge;
         do {
             h->face = face;
-            h = h->next;
-        } while (h != half_edge);
+        } while ((h = h->next) != half_edge);
     }
 
     for (int r = 0; r < kGridSize; ++r) {
@@ -289,13 +287,13 @@ CutMesh::FaceRef CutMesh::get_enclosing_face(Vec2 x) const {
     // return grid(r, c).faces[0];
 }
 
-Vec2 CutMesh::Face::center() const {
-    Vec2 res = Vec2::Zero();
+void CutMesh::Face::calculate_center() {
+    center = Vec2::Zero();
     int cnt = 0;
     auto h = half_edge;
     do {
-        res += h->vertex->position;
+        center += h->vertex->position;
         ++cnt;
     } while ((h = h->next) != half_edge);
-    return res / cnt;
+    center /= cnt;
 }

@@ -57,7 +57,8 @@ class CutMesh {
     struct Face {
         HalfEdgeRef half_edge;
         int id{};
-        [[nodiscard]] Vec2 center() const;
+        Vec2 center = Vec2::Zero();
+        void calculate_center();
         [[nodiscard]] bool enclose(const Vec2& x) const;
     };
 
