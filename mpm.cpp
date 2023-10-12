@@ -23,10 +23,10 @@ static Real random_real() {
 
 static Real interpolate(Real x) {
     x = std::abs(x);
-    /*if (x < 0.5) return 0.75 - x * x;
-    if (x < 1.5) return 0.5 * (1.5 - x) * (1.5 - x);
-    return 0.0;*/
-    return std::max(Real{0.0}, Real{0.75} - Real{0.5} * x);
+    if (x < 0.5) return 0.75 - x * x;
+    if (x <= 1.5) return 0.5 * (1.5 - x) * (1.5 - x);
+    return 0.0;
+    // return std::max(Real{0.0}, Real{0.75} - Real{0.5} * x);
 }
 
 static Real interpolate(Vec2 x) {
@@ -68,23 +68,17 @@ void MPM::update() {
     // P2G
     std::vector<int> neighbor_nodes;
     for (Particle& p : particles_) {
-        p.F = (Mat2::Identity() + kDeltaT * p.C.block<2, 2>(0, 1)) * p.F;
-        Real hardening_coefficient = 1.0;
+        p.F = (Mat2::Identity() + kDeltaT * p.C) * p.F;
+        Real hardening_coefficient = 0.5;
         Real mu = kMu0 * hardening_coefficient;
         Real lambda = kLambda0 * hardening_coefficient;
         auto [U, sig, V] = svd(p.F);
         Real J = p.F.determinant();
         Mat2 PF = 2.0 * mu * (p.F - U * V.transpose()) * p.F.transpose() +
                   Mat2::Identity() * lambda * J * (J - 1.0);
-        Mat3 M_inv = p.M_inv;
-        Mat23 affine = Mat23::Zero();
-        for (int i = 0; i < 2; ++i) {
-            for (int j = 0; j < 2; ++j)
-                affine.row(i) += M_inv.row(j + 1) * PF(i, j);
-        }
-        affine *= -kDeltaT * kParticleVolume;
+        Mat2 affine =
+            (-kDeltaT * kParticleVolume * 4.0 * kGridSize * kGridSize) * PF;
         affine += kParticleMass * p.C;
-        // auto neighbor_nodes = get_neighbor_nodes(p.x);
         get_neighbor_nodes_in_place(p.x, neighbor_nodes);
         int n_neighbor_nodes = static_cast<int>(neighbor_nodes.size());
         Real weight_sum = 0.0;
@@ -97,13 +91,10 @@ void MPM::update() {
         for (int i = 0; i < n_neighbor_nodes; ++i) {
             auto& g = nodes_[neighbor_nodes[i]];
             auto node_position = g.vertex->position;
-            Vec3 distance(0.0, node_position.x() - p.x.x(),
+            Vec2 distance(node_position.x() - p.x.x(),
                           node_position.y() - p.x.y());
-            distance *= kGridSize;
-            distance.x() = 1.0;
             Real weight = weights[i] / weight_sum;
-            distance *= kDeltaX;
-            g.v += weight * affine * distance;
+            g.v += weight * (kParticleMass * p.v + affine * distance);
             g.m += weight * kParticleMass;
         }
     }
@@ -136,24 +127,19 @@ void MPM::update() {
             weight_sum += weights[i];
         }
         Vec2 new_v = Vec2::Zero();
-        Mat23 new_C = Mat23::Zero();
-        Mat3 new_M = Mat3::Zero();
+        Mat2 new_C = Mat2::Zero();
         for (int i = 0; i < n_neighbor_nodes; ++i) {
             auto& g = nodes_[neighbor_nodes[i]];
             auto node_position = g.vertex->position;
-            Vec3 distance(0.0, node_position.x() - p.x.x(),
+            Vec2 distance(node_position.x() - p.x.x(),
                           node_position.y() - p.x.y());
             distance *= kGridSize;
-            distance.x() = 1.0;
             Real weight = weights[i] / weight_sum;
-            distance *= kDeltaX;
             new_v += weight * g.v;
-            new_C += weight * (g.v * distance.transpose());
-            new_M += weight * distance * distance.transpose();
+            new_C += 4.0 * kGridSize * weight * (g.v * distance.transpose());
         }
         p.v = new_v;
-        p.M_inv = new_M.inverse();
-        p.C = new_C * new_M.inverse();
+        p.C = new_C;
         p.x += kDeltaT * p.v;
     }
 }
