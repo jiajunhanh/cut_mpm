@@ -139,7 +139,7 @@ compute_cut_vertices_and_edges(const std::vector<std::array<Real, 2>>& vertices,
                 cut_v.b[d] = true;
                 if (cut_v.b[d ^ 1]) {
                     intersection_points.emplace_back(
-                        t, cut_v.c[1] * kRowSize * cut_v.c[0]);
+                        t, cut_v.c[1] * kRowSize + cut_v.c[0]);
                     continue;
                 }
                 cut_vertices.emplace_back(cut_v);
