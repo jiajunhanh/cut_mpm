@@ -419,7 +419,10 @@ static void show_cut_mesh() {
         return;
     }
 
-    static std::vector<std::array<Real, 2>> vertices;
+    static std::vector<std::array<Real, 2>> vertices{{Real{0.1}, kBoundary},
+                                                     {Real{0.1}, Real{0.9}},
+                                                     {Real{0.9}, Real{0.9}},
+                                                     {Real{0.9}, kBoundary}};
     static std::vector<std::array<int, 2>> edges;
     static auto cut_mesh =
         std::make_shared<CutMesh>(construct_cut_mesh(vertices, edges));
@@ -643,7 +646,7 @@ static void show_cut_mesh() {
             mpm.initialize();
             simulating = true;
         }
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; i < 8; ++i) {
             mpm.update();
         }
         for (const auto& p : mpm.particles()) {

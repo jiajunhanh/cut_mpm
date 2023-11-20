@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <memory>
 #include <queue>
 #include <vector>
 
@@ -36,14 +35,4 @@ class MPM {
     std::shared_ptr<CutMesh> cut_mesh_;
     std::vector<Particle> particles_;
     std::vector<GridNode> nodes_;
-    std::unordered_map<int, int> node_of_vertex_;
-
-    std::vector<bool> face_visited_;
-    std::vector<bool> is_neighbor_node_;
-    std::vector<CutMesh::FaceRef> neighbor_faces_;
-    std::queue<CutMesh::FaceRef> face_queue_;
-
-    std::vector<int> get_neighbor_nodes(const Vec2& x);
-    void get_neighbor_nodes_in_place(const Vec2& x,
-                                     std::vector<int>& neighbor_nodes);
 };

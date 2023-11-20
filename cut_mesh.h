@@ -2,9 +2,6 @@
 
 #include <Eigen/Dense>
 #include <iostream>
-#include <list>
-#include <stack>
-#include <utility>
 #include <vector>
 
 #include "mpm_config.h"
@@ -29,6 +26,7 @@ class CutMesh {
         FaceRef face;
 
         int id{};
+        bool is_boundary{};
 
         void set_tnvef(const HalfEdgeRef& twin_, const HalfEdgeRef& next_,
                        const VertexRef& vertex_, const EdgeRef& edge_,
@@ -58,6 +56,8 @@ class CutMesh {
         HalfEdgeRef half_edge;
         int id{};
         Vec2 center = Vec2::Zero();
+        std::vector<int> neighbor_nodes;
+        std::vector<int> neighbor_node_sides;
         void calculate_center();
         [[nodiscard]] bool enclose(const Vec2& x) const;
     };
@@ -93,6 +93,7 @@ class CutMesh {
     // void erase_face(FaceRef&& f);
 
     [[nodiscard]] FaceRef get_enclosing_face(Vec2 center) const;
+    void calculate_neighbor_nodes_of_faces();
 
    private:
     std::vector<HalfEdge> half_edges_;

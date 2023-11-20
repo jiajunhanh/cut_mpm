@@ -9,6 +9,10 @@ constexpr int kRowSize = kGridSize + 1;
 constexpr int kParticleNumber = 32 * kQuality * kQuality;
 constexpr Real kDeltaT = 2e-3 / kQuality;
 constexpr Real kDeltaX = 1.0 / kGridSize;
+constexpr Real kKernelRange = 1.5;
+constexpr Real kBoundary = 0.82;
+constexpr Real kMargin = kDeltaX / 64;
+constexpr int kValidBit = 30;
 // constexpr Real kInvDeltaX = kGridSize;
 
 // using Vec2i = Eigen::Vector2i;

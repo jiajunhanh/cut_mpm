@@ -7,6 +7,7 @@
   </component>
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/eigen" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/imgui" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/sdl" vcs="Git" />
