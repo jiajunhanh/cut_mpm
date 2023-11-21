@@ -425,7 +425,7 @@ static void show_cut_mesh() {
                                                      {Real{0.9}, kBoundary}};
     static std::vector<std::array<int, 2>> edges;
     static auto cut_mesh =
-        std::make_shared<CutMesh>(construct_cut_mesh(vertices, edges));
+        std::make_shared<CutMesh>(construct_cut_mesh(vertices));
     static MPM mpm(cut_mesh);
     static bool opt_enable_grid = true;
     static bool opt_construct_cut_mesh = true;
@@ -527,13 +527,7 @@ static void show_cut_mesh() {
     }
 
     if (opt_construct_cut_mesh) {
-        edges.clear();
-        for (int i = 0, size = static_cast<int>(vertices.size()); i < size;
-             ++i) {
-            auto j = (i + 1) % size;
-            edges.emplace_back(std::array{i, j});
-        }
-        *cut_mesh = construct_cut_mesh(vertices, edges);
+        *cut_mesh = construct_cut_mesh(vertices);
         selected_half_edge = cut_mesh->half_edges().begin();
         selected_face = end(cut_mesh->faces());
     }

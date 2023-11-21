@@ -8,20 +8,13 @@
 namespace {
 
 constexpr int kGridNodesNumber = kRowSize * kRowSize;
-/*
-static Real random_real() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    // static std::mt19937 gen(42);
-    static std::uniform_real_distribution<Real> dis(0.0, 1.0);
-    return dis(gen);
-}
-*/
 
 struct Vertex {
     int c[2] = {};
     Real q[2] = {};
     bool b[2] = {};
+    bool on_boundary = false;
+    Vec2 normal = Vec2::Zero();
 
     [[nodiscard]] Real coord(int d) const {
         return static_cast<Real>(c[d]) + q[d];
@@ -43,7 +36,11 @@ void lerp(Vertex& v, const Vertex& vi, const Vertex& vj, Real t, int d) {
     Real coord = coord_i + (coord_j - coord_i) * t;
     v.c[d] = static_cast<int>(std::floor(coord));
     v.q[d] = coord - std::floor(coord);
-    v.b[d] = v.q[d] == 0.0f;
+    v.b[d] = false;
+    if (v.q[d] <= kMargin) {
+        v.q[d] = 0;
+        v.b[d] = true;
+    }
 }
 
 void add_grid_edges(std::vector<Vertex>& cut_vertices,
@@ -90,8 +87,8 @@ void add_grid_edges(std::vector<Vertex>& cut_vertices,
 }
 
 std::pair<std::vector<Vertex>, std::vector<Edge>>
-compute_cut_vertices_and_edges(const std::vector<std::array<Real, 2>>& vertices,
-                               const std::vector<std::array<int, 2>>& edges) {
+compute_cut_vertices_and_edges(
+    const std::vector<std::array<Real, 2>>& vertices) {
     std::vector<Vertex> cut_vertices;
     std::vector<Edge> cut_edges;
     for (int r = 0; r < kRowSize; ++r) {
@@ -109,14 +106,21 @@ compute_cut_vertices_and_edges(const std::vector<std::array<Real, 2>>& vertices,
             Real x = v[d] * kGridSize;
             cut_vertex.c[d] = static_cast<int>(std::floor(x));
             cut_vertex.q[d] = x - std::floor(x);
-            cut_vertex.b[d] = (cut_vertex.q[d] == Real{0});
+            cut_vertex.b[d] = false;
+            cut_vertex.on_boundary = true;
+            if (cut_vertex.q[d] <= kMargin) {
+                cut_vertex.q[d] = 0;
+                cut_vertex.b[d] = true;
+            }
         }
         cut_vertices.emplace_back(cut_vertex);
     }
-    for (const auto& e : edges) {
+    for (int i = 0, vertices_size = static_cast<int>(vertices.size());
+         i < vertices_size; ++i) {
+        auto j = (i + 1) % vertices_size;
         std::vector<std::pair<Real, int>> intersection_points;
-        const Vertex vi = cut_vertices[e[0] + kGridNodesNumber];
-        const Vertex vj = cut_vertices[e[1] + kGridNodesNumber];
+        const Vertex vi = cut_vertices[i + kGridNodesNumber];
+        const Vertex vj = cut_vertices[j + kGridNodesNumber];
         for (int d = 0; d < 2; ++d) {
             int z_min;
             int z_max;
@@ -132,14 +136,17 @@ compute_cut_vertices_and_edges(const std::vector<std::array<Real, 2>>& vertices,
                 static_cast<Real>(vj.c[d] - vi.c[d]) + (vj.q[d] - vi.q[d]);
             for (int z = z_min; z <= z_max; ++z) {
                 Real t = (static_cast<Real>(z - vi.c[d]) - vi.q[d]) / distance;
+                if (t <= 0 || t >= 1) continue;
                 Vertex cut_v;
                 lerp(cut_v, vi, vj, t, d ^ 1);
                 cut_v.c[d] = z;
                 cut_v.q[d] = 0;
                 cut_v.b[d] = true;
+                cut_v.on_boundary = true;
                 if (cut_v.b[d ^ 1]) {
-                    intersection_points.emplace_back(
-                        t, cut_v.c[1] * kRowSize + cut_v.c[0]);
+                    auto grid_id = cut_v.c[1] * kRowSize + cut_v.c[0];
+                    cut_vertices[grid_id].on_boundary = true;
+                    intersection_points.emplace_back(t, grid_id);
                     continue;
                 }
                 cut_vertices.emplace_back(cut_v);
@@ -147,27 +154,20 @@ compute_cut_vertices_and_edges(const std::vector<std::array<Real, 2>>& vertices,
                     t, static_cast<int>(cut_vertices.size()) - 1);
             }
         }
+        intersection_points.emplace_back(Real{0}, i + kGridNodesNumber);
+        intersection_points.emplace_back(Real{1}, j + kGridNodesNumber);
         std::sort(
             begin(intersection_points), end(intersection_points),
             [](const auto& a, const auto& b) { return a.first < b.first; });
-        if (intersection_points.empty()) {
-            cut_edges.emplace_back(e[0] + kGridNodesNumber,
-                                   e[1] + kGridNodesNumber, true);
-            continue;
-        }
-        cut_edges.emplace_back(e[0] + kGridNodesNumber,
-                               intersection_points.front().second, true);
-        for (int i = 0, size = static_cast<int>(intersection_points.size());
-             i + 1 < size; ++i) {
-            if (intersection_points[i].second ==
-                intersection_points[i + 1].second) {
+        for (int k = 0, size = static_cast<int>(intersection_points.size());
+             k + 1 < size; ++k) {
+            if (intersection_points[k].second ==
+                intersection_points[k + 1].second) {
                 continue;
             }
-            cut_edges.emplace_back(intersection_points[i].second,
-                                   intersection_points[i + 1].second, true);
+            cut_edges.emplace_back(intersection_points[k].second,
+                                   intersection_points[k + 1].second, true);
         }
-        cut_edges.emplace_back(intersection_points.back().second,
-                               e[1] + kGridNodesNumber, true);
     }
     add_grid_edges(cut_vertices, cut_edges);
     return {cut_vertices, cut_edges};
@@ -204,10 +204,17 @@ bool is_neighbor_face(CutMesh::FaceRef face0, CutMesh::FaceRef face1) {
 
 }  // namespace
 
-CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
-                           const std::vector<std::array<int, 2>>& edges) {
-    auto [cut_vertices, cut_edges] =
-        compute_cut_vertices_and_edges(vertices, edges);
+CutMesh construct_cut_mesh(std::vector<std::array<Real, 2>> vertices) {
+    Real orientation = 0;
+    for (int i = 0, vertices_size = static_cast<int>(vertices.size());
+         i < vertices_size; ++i) {
+        auto j = (i + 1) % vertices_size;
+        orientation += (vertices[j][0] - vertices[i][0]) *
+                       (vertices[j][1] + vertices[i][1]);
+    }
+    if (orientation > 0) reverse(begin(vertices), end(vertices));
+
+    auto [cut_vertices, cut_edges] = compute_cut_vertices_and_edges(vertices);
 
     CutMesh cut_mesh;
     std::vector<CutMesh::VertexRef> mesh_vertices;

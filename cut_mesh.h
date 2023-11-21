@@ -107,5 +107,4 @@ class CutMesh {
     // std::stack<FaceRef> recycled_faces_;
 };
 
-CutMesh construct_cut_mesh(const std::vector<std::array<Real, 2>>& vertices,
-                           const std::vector<std::array<int, 2>>& edges);
+CutMesh construct_cut_mesh(std::vector<std::array<Real, 2>> vertices);
