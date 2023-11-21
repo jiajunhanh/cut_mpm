@@ -419,12 +419,16 @@ static void show_cut_mesh() {
         return;
     }
 
-    constexpr Real gap = 0.02;
+    constexpr Real gap = 0.005;
     static std::vector<std::array<Real, 2>> vertices{
         {Real{0.5} - gap / 2, Real{0.6}}, {Real{0.1}, Real{0.3}},
         {Real{0.1}, Real{0.9}},           {Real{0.9}, Real{0.9}},
         {Real{0.9}, Real{0.3}},           {Real{0.5} + gap / 2, Real{0.6}},
-        {Real{0.82}, Real{0.82}},         {Real{0.18}, Real{0.82}}};
+        {Real{0.8}, Real{0.8}},           {Real{0.2}, Real{0.8}}};
+    /*static std::vector<std::array<Real, 2>> vertices{
+        {Real{0.5}, Real{0.9}}, {Real{0.1}, Real{0.9}}, {Real{0.1}, Real{0.5}},
+        {Real{0.2}, Real{0.8}}, {Real{0.3}, Real{0.5}}, {Real{0.4}, Real{0.8}},
+        {Real{0.5}, Real{0.5}}};*/
     static std::vector<std::array<int, 2>> edges;
     static auto cut_mesh = std::make_shared<CutMesh>(vertices);
     static MPM mpm(cut_mesh);

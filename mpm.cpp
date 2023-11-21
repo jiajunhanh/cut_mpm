@@ -23,16 +23,6 @@ Real random_real() {
     return dis(gen);
 }
 
-Real interpolate(Real x) {
-    x = std::abs(x);
-    if (x < 0.5) return 0.75 - x * x;
-    if (x < 1.5) return 0.5 * (1.5 - x) * (1.5 - x);
-    return 0.0;
-    // return std::max(Real{0}, Real{1.5} - x);
-}
-
-Real interpolate(Vec2 x) { return interpolate(x.x()) * interpolate(x.y()); }
-
 auto svd(const Mat2& m) {
     Eigen::JacobiSVD<Mat2, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(m);
     return std::tuple{svd.matrixU(), svd.singularValues(), svd.matrixV()};
@@ -47,6 +37,7 @@ MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh_) : cut_mesh_(cut_mesh_) {
          i < n_vertices; ++i, ++v)
         nodes_[i].vertex = v;
     cut_mesh_->calculate_neighbor_nodes_of_faces();
+    cut_mesh_->calculate_node_normals();
 }
 
 void MPM::initialize() {
@@ -68,10 +59,10 @@ void MPM::update() {
         p.F = (Mat2::Identity() + kDeltaT * p.C.block<2, 2>(0, 1)) * p.F;
         Real hardening_coefficient = 0.5;
         Real mu = kMu0 * hardening_coefficient;
-        mu = 0;
         Real lambda = kLambda0 * hardening_coefficient;
         auto [U, sig, V] = svd(p.F);
         Real J = p.F.determinant();
+        mu = 0;
         p.F = Mat2::Identity() * std::sqrt(J);
         Mat2 PF = 2.0 * mu * (p.F - U * V.transpose()) * p.F.transpose() +
                   Mat2::Identity() * lambda * J * (J - 1.0);
@@ -115,12 +106,12 @@ void MPM::update() {
         if (g.m <= 0) continue;
         g.v /= g.m;
         g.v += kDeltaT * kGravity * 30;
-        if (g.vertex->on_boundary) {
+        if (g.vertex->normal != Vec2::Zero()) {
             auto dot = g.v.dot(g.vertex->normal);
             dot = std::min(dot, Real{0});
             g.v = g.v - dot * g.vertex->normal;
-            continue;
         }
+        if (g.vertex->on_boundary) continue;
         auto id = g.vertex->id;
         int x = id % kRowSize;
         int y = id / kRowSize;

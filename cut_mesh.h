@@ -59,7 +59,7 @@ class CutMesh {
         int id = 0;
         Vec2 center = Vec2::Zero();
         std::vector<int> neighbor_nodes;
-        std::vector<int> neighbor_node_sides;
+        std::vector<bool> neighbor_node_sides;
         void calculate_center();
         [[nodiscard]] bool enclose(const Vec2& x) const;
     };
@@ -99,6 +99,7 @@ class CutMesh {
 
     [[nodiscard]] FaceRef get_enclosing_face(Vec2 center) const;
     void calculate_neighbor_nodes_of_faces();
+    void calculate_node_normals();
 
    private:
     std::vector<HalfEdge> half_edges_;

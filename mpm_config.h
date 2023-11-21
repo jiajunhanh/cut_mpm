@@ -24,3 +24,15 @@ using Mat2 = std::conditional_t<std::is_same_v<Real, float>, Eigen::Matrix2f,
                                 Eigen::Matrix2d>;
 using Mat3 = std::conditional_t<std::is_same_v<Real, float>, Eigen::Matrix3f,
                                 Eigen::Matrix3d>;
+
+inline Real interpolate(Real x) {
+    x = std::abs(x);
+    if (x < 0.5) return 0.75 - x * x;
+    if (x < 1.5) return 0.5 * (1.5 - x) * (1.5 - x);
+    return 0.0;
+    // return std::max(Real{0}, Real{1.5} - x);
+}
+
+inline Real interpolate(Vec2 x) {
+    return interpolate(x.x()) * interpolate(x.y());
+}
