@@ -426,8 +426,7 @@ static void show_cut_mesh() {
         {Real{0.9}, Real{0.3}},           {Real{0.5} + gap / 2, Real{0.6}},
         {Real{0.82}, Real{0.82}},         {Real{0.18}, Real{0.82}}};
     static std::vector<std::array<int, 2>> edges;
-    static auto cut_mesh =
-        std::make_shared<CutMesh>(construct_cut_mesh(vertices));
+    static auto cut_mesh = std::make_shared<CutMesh>(vertices);
     static MPM mpm(cut_mesh);
     static bool opt_enable_grid = true;
     static bool opt_construct_cut_mesh = true;
@@ -529,7 +528,7 @@ static void show_cut_mesh() {
     }
 
     if (opt_construct_cut_mesh) {
-        *cut_mesh = construct_cut_mesh(vertices);
+        *cut_mesh = CutMesh(vertices);
         selected_half_edge = cut_mesh->half_edges().begin();
         selected_face = end(cut_mesh->faces());
     }

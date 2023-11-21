@@ -69,6 +69,9 @@ class CutMesh {
         std::vector<FaceRef> faces;
     };
 
+    CutMesh() = default;
+    explicit CutMesh(std::vector<std::array<Real, 2>> vertices);
+
     auto& half_edges() { return half_edges_; }
     auto& vertices() { return vertices_; }
     auto& edges() { return edges_; }
@@ -108,5 +111,3 @@ class CutMesh {
     // std::stack<EdgeRef> recycled_edges_;
     // std::stack<FaceRef> recycled_faces_;
 };
-
-CutMesh construct_cut_mesh(std::vector<std::array<Real, 2>> vertices);
