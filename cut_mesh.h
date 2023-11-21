@@ -25,8 +25,8 @@ class CutMesh {
         VertexRef vertex;
         FaceRef face;
 
-        int id{};
-        bool is_boundary{};
+        int id = 0;
+        bool is_boundary = false;
 
         void set_tnvef(const HalfEdgeRef& twin_, const HalfEdgeRef& next_,
                        const VertexRef& vertex_, const EdgeRef& edge_,
@@ -41,20 +41,22 @@ class CutMesh {
 
     struct Edge {
         HalfEdgeRef half_edge;
-        int id{};
+        int id = 0;
     };
 
     struct Vertex {
         HalfEdgeRef half_edge;
-        int id{};
-        int grid_id{};
+        int id = 0;
+        // int grid_id = 0;
         Vec2 position{};
-        std::array<bool, 2> on_edge{};
+
+        bool on_boundary = false;
+        Vec2 normal = Vec2::Zero();
     };
 
     struct Face {
         HalfEdgeRef half_edge;
-        int id{};
+        int id = 0;
         Vec2 center = Vec2::Zero();
         std::vector<int> neighbor_nodes;
         std::vector<int> neighbor_node_sides;

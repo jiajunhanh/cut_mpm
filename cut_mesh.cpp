@@ -13,8 +13,6 @@ struct Vertex {
     int c[2] = {};
     Real q[2] = {};
     bool b[2] = {};
-    bool on_boundary = false;
-    Vec2 normal = Vec2::Zero();
 
     [[nodiscard]] Real coord(int d) const {
         return static_cast<Real>(c[d]) + q[d];
@@ -107,7 +105,6 @@ compute_cut_vertices_and_edges(
             cut_vertex.c[d] = static_cast<int>(std::floor(x));
             cut_vertex.q[d] = x - std::floor(x);
             cut_vertex.b[d] = false;
-            cut_vertex.on_boundary = true;
             if (cut_vertex.q[d] <= kMargin) {
                 cut_vertex.q[d] = 0;
                 cut_vertex.b[d] = true;
@@ -142,10 +139,8 @@ compute_cut_vertices_and_edges(
                 cut_v.c[d] = z;
                 cut_v.q[d] = 0;
                 cut_v.b[d] = true;
-                cut_v.on_boundary = true;
                 if (cut_v.b[d ^ 1]) {
                     auto grid_id = cut_v.c[1] * kRowSize + cut_v.c[0];
-                    cut_vertices[grid_id].on_boundary = true;
                     intersection_points.emplace_back(t, grid_id);
                     continue;
                 }
@@ -217,10 +212,8 @@ CutMesh construct_cut_mesh(std::vector<std::array<Real, 2>> vertices) {
     auto [cut_vertices, cut_edges] = compute_cut_vertices_and_edges(vertices);
 
     CutMesh cut_mesh;
-    std::vector<CutMesh::VertexRef> mesh_vertices;
     std::vector<std::vector<CutMesh::HalfEdgeRef>> vertex_half_edges;
     cut_mesh.vertices().reserve(cut_vertices.size());
-    mesh_vertices.reserve(cut_vertices.size());
     vertex_half_edges.resize(cut_vertices.size());
 
     for (const Vertex& cut_vertex : cut_vertices) {
@@ -228,11 +221,10 @@ CutMesh construct_cut_mesh(std::vector<std::array<Real, 2>> vertices) {
         for (int d = 0; d < 2; ++d) {
             v->position[d] =
                 static_cast<Real>(cut_vertex.c[d]) + cut_vertex.q[d];
-            v->on_edge[d] = cut_vertex.b[d];
+            // v->on_edge[d] = cut_vertex.b[d];
         }
-        v->grid_id = cut_vertex.c[1] * kGridSize + cut_vertex.c[0];
+        // v->grid_id = cut_vertex.c[1] * kGridSize + cut_vertex.c[0];
         v->position /= kGridSize;
-        mesh_vertices.emplace_back(v);
     }
 
     cut_mesh.half_edges().reserve(2 * cut_edges.size());
@@ -240,8 +232,8 @@ CutMesh construct_cut_mesh(std::vector<std::array<Real, 2>> vertices) {
     for (const Edge& cut_edge : cut_edges) {
         auto h0 = cut_mesh.emplace_half_edge();
         auto h1 = cut_mesh.emplace_half_edge();
-        auto v0 = mesh_vertices[cut_edge.i];
-        auto v1 = mesh_vertices[cut_edge.j];
+        auto v0 = begin(cut_mesh.vertices()) + cut_edge.i;
+        auto v1 = begin(cut_mesh.vertices()) + cut_edge.j;
         auto e = cut_mesh.emplace_edge();
         h0->set_tnvef(h1, h0->next, v0, e, h0->face);
         h1->set_tnvef(h0, h1->next, v1, e, h1->face);
@@ -249,13 +241,28 @@ CutMesh construct_cut_mesh(std::vector<std::array<Real, 2>> vertices) {
         v0->half_edge = h0;
         v1->half_edge = h1;
         e->half_edge = h0;
+
+        if (cut_edge.is_boundary) {
+            v0->on_boundary = v1->on_boundary = true;
+            Vec2 normal = v1->position - v0->position;
+            normal = Vec2(normal.y(), -normal.x());
+            normal.normalize();
+            v0->normal += normal;
+            v1->normal += normal;
+        }
+
         vertex_half_edges[cut_edge.i].emplace_back(h0);
         vertex_half_edges[cut_edge.j].emplace_back(h1);
     }
 
-    for (int iv = 0, n_vertices = static_cast<int>(mesh_vertices.size());
+    for (auto& v : cut_mesh.vertices()) {
+        if (!v.on_boundary) continue;
+        v.normal.normalize();
+    }
+
+    for (int iv = 0, n_vertices = static_cast<int>(cut_mesh.vertices().size());
          iv < n_vertices; ++iv) {
-        auto v = mesh_vertices[iv];
+        auto v = begin(cut_mesh.vertices()) + iv;
         auto& half_edges = vertex_half_edges[iv];
         int n_half_edges = static_cast<int>(half_edges.size());
         std::vector<Real> angles(n_half_edges);
@@ -310,7 +317,8 @@ CutMesh construct_cut_mesh(std::vector<std::array<Real, 2>> vertices) {
 
     for (int r = 0; r < kGridSize; ++r) {
         for (int c = 0; c < kGridSize; ++c) {
-            cut_mesh.grid(r, c).vertex = mesh_vertices[r * kRowSize + c];
+            cut_mesh.grid(r, c).vertex =
+                begin(cut_mesh.vertices()) + (r * kRowSize + c);
         }
     }
 

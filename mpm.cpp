@@ -54,7 +54,7 @@ void MPM::initialize() {
     particles_.resize(kParticleNumber);
     for (Particle& p : particles_) {
         p.x.x() = random_real() * Real{0.35} + Real{0.2};
-        p.x.y() = random_real() * Real{0.35} + Real{0.2};
+        p.x.y() = random_real() * Real{0.35} + Real{0.02};
     }
 }
 
@@ -68,11 +68,11 @@ void MPM::update() {
         p.F = (Mat2::Identity() + kDeltaT * p.C.block<2, 2>(0, 1)) * p.F;
         Real hardening_coefficient = 0.5;
         Real mu = kMu0 * hardening_coefficient;
-        // Real mu = 0;
+        mu = 0;
         Real lambda = kLambda0 * hardening_coefficient;
         auto [U, sig, V] = svd(p.F);
         Real J = p.F.determinant();
-        // p.F = Mat2::Identity() * std::sqrt(J);
+        p.F = Mat2::Identity() * std::sqrt(J);
         Mat2 PF = 2.0 * mu * (p.F - U * V.transpose()) * p.F.transpose() +
                   Mat2::Identity() * lambda * J * (J - 1.0);
         Mat3 M_inv = p.M_inv;
@@ -112,13 +112,16 @@ void MPM::update() {
     }
     // Grid update
     for (GridNode& g : nodes_) {
-        int id = g.vertex->id;
         if (g.m <= 0) continue;
         g.v /= g.m;
         g.v += kDeltaT * kGravity * 30;
-        // if (g.vertex->id >= kRowSize * kRowSize) continue;
-        if (g.vertex->id >= kRowSize * kRowSize)
-            g.v.y() = std::min(g.v.y(), Real{0});
+        if (g.vertex->on_boundary) {
+            auto dot = g.v.dot(g.vertex->normal);
+            dot = std::min(dot, Real{0});
+            g.v = g.v - dot * g.vertex->normal;
+            continue;
+        }
+        auto id = g.vertex->id;
         int x = id % kRowSize;
         int y = id / kRowSize;
         if (x < 3 && g.v[0] < 0) g.v[0] = 0;
@@ -146,7 +149,7 @@ void MPM::update() {
         for (int i = 0; i < n_neighbor_nodes; ++i) {
             if (!neighbor_node_sides[i]) continue;
             if (weights[i] <= 0) continue;
-            auto& g = nodes_[neighbor_nodes[i]];
+            const auto& g = nodes_[neighbor_nodes[i]];
             Vec3 distance(0.0, g.vertex->position.x() - p.x.x(),
                           g.vertex->position.y() - p.x.y());
             distance *= kGridSize;
@@ -161,10 +164,5 @@ void MPM::update() {
         p.M_inv = new_M.inverse();
         p.C = new_C * new_M.inverse();
         p.x += kDeltaT * p.v;
-        if (p.x.y() > kBoundary - kMargin) {
-            p.v.y() =
-                (kBoundary - kMargin - (p.x.y() - kDeltaT * p.v.y())) / kDeltaT;
-            p.x.y() = kBoundary - kMargin;
-        }
     }
 }
