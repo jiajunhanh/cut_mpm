@@ -27,6 +27,7 @@ class CutMesh {
 
         int id = 0;
         bool is_boundary = false;
+        Vec2 normal = Vec2::Zero();
 
         void set_tnvef(const HalfEdgeRef& twin_, const HalfEdgeRef& next_,
                        const VertexRef& vertex_, const EdgeRef& edge_,
@@ -60,6 +61,7 @@ class CutMesh {
         Vec2 center = Vec2::Zero();
         std::vector<int> neighbor_nodes;
         std::vector<bool> neighbor_node_sides;
+        std::vector<int> neighbor_boundaries;
         void calculate_center();
         [[nodiscard]] bool enclose(const Vec2& x) const;
     };
@@ -98,7 +100,7 @@ class CutMesh {
     // void erase_face(FaceRef&& f);
 
     [[nodiscard]] FaceRef get_enclosing_face(Vec2 center) const;
-    void calculate_neighbor_nodes_of_faces();
+    void calculate_neighbor_nodes_and_boundaries_of_faces();
     void calculate_node_normals();
 
    private:

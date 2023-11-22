@@ -267,6 +267,7 @@ CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices) {
             Vec2 normal = v1->position - v0->position;
             normal = Vec2(normal.y(), -normal.x());
             normal.normalize();
+            h0->normal = h1->normal = normal;
             v0->normal += normal;
             v1->normal += normal;
         }
@@ -354,10 +355,11 @@ CutMesh::FaceRef CutMesh::get_enclosing_face(Vec2 x) const {
     // return grid(r, c).faces[0];
 }
 
-void CutMesh::calculate_neighbor_nodes_of_faces() {
+void CutMesh::calculate_neighbor_nodes_and_boundaries_of_faces() {
     std::vector<bool> face_visited(faces_.size());
     std::vector<bool> is_neighbor_node(vertices_.size());
     std::vector<bool> neighbor_node_sides(vertices_.size());
+    std::vector<bool> is_neighbor_boundary(half_edges_.size());
     std::vector<CutMesh::FaceRef> neighbor_faces;
     std::vector<bool> neighbor_face_sides;
     std::queue<std::pair<CutMesh::FaceRef, bool>> q;
@@ -366,8 +368,11 @@ void CutMesh::calculate_neighbor_nodes_of_faces() {
         std::fill(begin(face_visited), end(face_visited), false);
         std::fill(begin(is_neighbor_node), end(is_neighbor_node), false);
         std::fill(begin(neighbor_node_sides), end(neighbor_node_sides), false);
+        std::fill(begin(is_neighbor_boundary), end(is_neighbor_boundary),
+                  false);
         cut_face->neighbor_nodes.clear();
         cut_face->neighbor_node_sides.clear();
+        cut_face->neighbor_boundaries.clear();
         neighbor_faces.clear();
         neighbor_face_sides.clear();
         q.emplace(cut_face, true);
@@ -397,6 +402,14 @@ void CutMesh::calculate_neighbor_nodes_of_faces() {
                 if (is_neighbor_node[id]) continue;
                 is_neighbor_node[id] = true;
                 cut_face->neighbor_nodes.emplace_back(id);
+            } while ((h = h->next) != f->half_edge);
+
+            h = f->half_edge;
+            do {
+                if (s && h->is_boundary && !is_neighbor_boundary[h->id]) {
+                    is_neighbor_boundary[h->id] = true;
+                    cut_face->neighbor_boundaries.emplace_back(h->id);
+                }
             } while ((h = h->next) != f->half_edge);
         }
         for (const auto& i : cut_face->neighbor_nodes)

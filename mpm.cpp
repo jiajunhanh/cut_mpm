@@ -28,6 +28,21 @@ auto svd(const Mat2& m) {
     return std::tuple{svd.matrixU(), svd.singularValues(), svd.matrixV()};
 }
 
+bool collision(const Vec2& px, Vec2& pv, const Vec2& o, const Vec2& d) {
+    auto denominator = d.x() * pv.y() - d.y() * pv.x();
+    if (denominator == 0) return false;
+    Real t1 =
+        (px.x() * pv.y() - px.y() * pv.x() + o.y() * pv.x() - o.x() * pv.y()) /
+        denominator;
+    if (t1 < -kMargin / kDeltaX || t1 > 1 + kMargin / kDeltaX) return false;
+    Real t0 =
+        (o.y() * d.x() - o.x() * d.y() + px.x() * d.y() - px.y() * d.x()) /
+        denominator;
+    if (t0 < 0 || (t0 - kDeltaT) * pv.norm() > kMargin) return false;
+    pv *= std::max(Real{0}, t0 - kMargin / pv.norm()) / kDeltaT;
+    return true;
+}
+
 }  // namespace
 
 MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh_) : cut_mesh_(cut_mesh_) {
@@ -36,7 +51,7 @@ MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh_) : cut_mesh_(cut_mesh_) {
     for (auto [i, v] = std::tuple(0, begin(cut_mesh_->vertices()));
          i < n_vertices; ++i, ++v)
         nodes_[i].vertex = v;
-    cut_mesh_->calculate_neighbor_nodes_of_faces();
+    cut_mesh_->calculate_neighbor_nodes_and_boundaries_of_faces();
     cut_mesh_->calculate_node_normals();
 }
 
@@ -154,6 +169,24 @@ void MPM::update() {
         p.v = new_v;
         p.M_inv = new_M.inverse();
         p.C = new_C * new_M.inverse();
-        p.x += kDeltaT * p.v;
+
+        Vec2 old_x = p.x;
+        for (int i = 0; i < 8; ++i) {
+            bool colliding = false;
+            for (int id : enclosing_face->neighbor_boundaries) {
+                auto h = begin(cut_mesh_->half_edges()) + id;
+                if (p.v.dot(h->normal) > 0) continue;
+                auto p0 = h->vertex->position;
+                auto p1 = h->twin->vertex->position;
+                if (collision(p.x, p.v, p0, p1 - p0)) {
+                    colliding = true;
+                    p.x += p.v * kDeltaT;
+                    p.v = 2 * kMargin * h->normal / kDeltaT;
+                }
+            }
+            if (!colliding) break;
+        }
+        p.x += p.v * kDeltaT;
+        p.v = (p.x - old_x) / kDeltaT;
     }
 }

@@ -421,14 +421,15 @@ static void show_cut_mesh() {
 
     constexpr Real gap = 0.005;
     static std::vector<std::array<Real, 2>> vertices{
-        {Real{0.5} - gap / 2, Real{0.6}}, {Real{0.1}, Real{0.3}},
-        {Real{0.1}, Real{0.9}},           {Real{0.9}, Real{0.9}},
-        {Real{0.9}, Real{0.3}},           {Real{0.5} + gap / 2, Real{0.6}},
-        {Real{0.8}, Real{0.8}},           {Real{0.2}, Real{0.8}}};
-    /*static std::vector<std::array<Real, 2>> vertices{
-        {Real{0.5}, Real{0.9}}, {Real{0.1}, Real{0.9}}, {Real{0.1}, Real{0.5}},
-        {Real{0.2}, Real{0.8}}, {Real{0.3}, Real{0.5}}, {Real{0.4}, Real{0.8}},
-        {Real{0.5}, Real{0.5}}};*/
+        {Real{0.3} - gap / 2, Real{0.6}}, {Real{0.01}, Real{0.1}},
+        {Real{0.01}, Real{0.99}},         {Real{0.99}, Real{0.99}},
+        {Real{0.99}, Real{0.1}},          {Real{0.3} + gap / 2, Real{0.6}},
+        {Real{0.95}, Real{0.95}},         {Real{0.05}, Real{0.95}}};
+    /*static std::vector<std::array<Real, 2>> vertices{{Real{0.375},
+       Real{0.59}}, {Real{0.325}, Real{0.95}}, {Real{0.425}, Real{0.95}}};*/
+    /*static std::vector<std::array<Real, 2>> vertices{{Real{0.05}, Real{0.5}},
+                                                     {Real{0.95}, Real{0.5}},
+                                                     {Real{0.5}, Real{0.95}}};*/
     static std::vector<std::array<int, 2>> edges;
     static auto cut_mesh = std::make_shared<CutMesh>(vertices);
     static MPM mpm(cut_mesh);
@@ -649,10 +650,11 @@ static void show_cut_mesh() {
             mpm.update();
         }
         for (const auto& p : mpm.particles()) {
+            constexpr float radius = kQuality > 8 ? 1.5 : 2;
             draw_list->AddCircleFilled(
                 ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
                        origin.y + static_cast<float>(p.x.y()) * canvas_width),
-                2, IM_COL32(6, 133, 135, 255));
+                radius, IM_COL32(6, 133, 135, 255));
         }
     } else {
         simulating = false;
