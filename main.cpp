@@ -685,7 +685,7 @@ static void show_cut_mesh() {
             mpm.initialize();
             simulating = true;
         }
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < static_cast<int>(std::pow(2, quality - 1)); ++i) {
             mpm.update();
         }
         for (const auto& p : mpm.particles()) {

@@ -27,6 +27,9 @@ target_include_directories(mandoline2d PRIVATE
 find_package(Vulkan REQUIRED)
 target_link_libraries(mandoline2d PRIVATE Vulkan::Vulkan)
 
+find_package(OpenMP REQUIRED)
+target_link_libraries(mandoline2d PRIVATE OpenMP::OpenMP_CXX)
+
 add_subdirectory(deps/sdl)
 target_link_libraries(mandoline2d PRIVATE SDL2::SDL2main)
 target_link_libraries(mandoline2d PRIVATE SDL2::SDL2)

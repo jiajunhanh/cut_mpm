@@ -125,11 +125,11 @@ class CutMesh {
             : i(i_), j(j_), is_boundary(is_boundary_) {}
     };
 
-    int grid_size_ = 0;
-    int row_size_ = 0;
-    int n_grid_nodes_ = 0;
-    Real delta_x_ = 0;
-    Real margin_ = 0;
+    int grid_size_;
+    int row_size_;
+    int n_grid_nodes_;
+    Real delta_x_;
+    Real margin_;
 
     std::vector<HalfEdge> half_edges_;
     std::vector<Vertex> vertices_;

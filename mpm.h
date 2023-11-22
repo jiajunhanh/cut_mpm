@@ -32,17 +32,17 @@ class MPM {
     }
 
    private:
-    int quality_ = 8;
-    int grid_size_ = 8 * quality_;
-    int row_size_ = grid_size_ + 1;
-    int n_particles_ = 32 * quality_ * quality_;
-    int material_ = 0;
-    Real delta_t_ = Real{2e-3} / static_cast<Real>(quality_);
-    Real delta_x_ = Real{1.0} / static_cast<Real>(grid_size_);
-    Real margin_ = delta_x_ / 32;
-    Real particle_volume_ = delta_x_ * delta_x_ * Real{0.25};
-    Real particle_density_ = 1.0;
-    Real k_particle_mass_ = particle_volume_ * particle_density_;
+    int quality_;
+    int grid_size_;
+    int row_size_;
+    int n_particles_;
+    int material_;
+    Real delta_t_;
+    Real delta_x_;
+    Real margin_;
+    Real particle_volume_;
+    Real particle_density_;
+    Real k_particle_mass_;
 
     std::shared_ptr<CutMesh> cut_mesh_;
     std::vector<Particle> particles_;

@@ -75,11 +75,13 @@ void MPM::initialize() {
 }
 
 void MPM::update() {
+#pragma omp parallel for default(none), shared(std::cout)
     for (GridNode& g : nodes_) {
         g.m = 0.0;
         g.v.setZero();
     }
     // P2G
+#pragma omp parallel for default(none)
     for (Particle& p : particles_) {
         p.F = (Mat2::Identity() + delta_t_ * p.C.block<2, 2>(0, 1)) * p.F;
         Real hardening_coefficient = 0.5;
@@ -125,11 +127,17 @@ void MPM::update() {
             distance.x() = 1.0;
             Real weight = weights[i] / weight_sum;
             distance *= delta_x_;
-            g.v += weight * affine * distance;
+            Vec2 v_add = weight * affine * distance;
+#pragma omp atomic
+            g.v[0] += v_add[0];
+#pragma omp atomic
+            g.v[1] += v_add[1];
+#pragma omp atomic
             g.m += weight * k_particle_mass_;
         }
     }
     // Grid update
+#pragma omp parallel for default(none) shared(kGravity)
     for (GridNode& g : nodes_) {
         if (g.m <= 0) continue;
         g.v /= g.m;
@@ -149,6 +157,7 @@ void MPM::update() {
         if (y > grid_size_ - 3 && g.v[1] > 0) g.v[1] = 0;
     }
     // G2P
+#pragma omp parallel for default(none)
     for (Particle& p : particles_) {
         auto enclosing_face = cut_mesh_->get_enclosing_face(p.x);
         const auto& neighbor_nodes = enclosing_face->neighbor_nodes;
