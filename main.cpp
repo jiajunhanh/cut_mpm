@@ -414,29 +414,40 @@ static void show_cut_mesh() {
         ImVec2(main_viewport->WorkPos.x + 20, main_viewport->WorkPos.y + 20),
         ImGuiCond_FirstUseEver);
 
-    if (!ImGui::Begin("Cut_MPM")) {
+    if (!ImGui::Begin("CUT_MPM")) {
         ImGui::End();
         return;
     }
 
-    constexpr Real gap = 0.005;
+    /*constexpr Real gap = 0.005;
     static std::vector<std::array<Real, 2>> vertices{
         {Real{0.3} - gap / 2, Real{0.6}}, {Real{0.01}, Real{0.1}},
         {Real{0.01}, Real{0.99}},         {Real{0.99}, Real{0.99}},
         {Real{0.99}, Real{0.1}},          {Real{0.3} + gap / 2, Real{0.6}},
-        {Real{0.95}, Real{0.95}},         {Real{0.05}, Real{0.95}}};
+        {Real{0.95}, Real{0.95}},         {Real{0.05}, Real{0.95}}};*/
     /*static std::vector<std::array<Real, 2>> vertices{{Real{0.375},
        Real{0.59}}, {Real{0.325}, Real{0.95}}, {Real{0.425}, Real{0.95}}};*/
     /*static std::vector<std::array<Real, 2>> vertices{{Real{0.05}, Real{0.5}},
                                                      {Real{0.95}, Real{0.5}},
                                                      {Real{0.5}, Real{0.95}}};*/
+    /*static std::vector<std::array<Real, 2>> vertices{{Real{0.075}, Real{0.4}},
+                                                     {Real{0.375}, Real{0.9}},
+                                                     {Real{0.675}, Real{0.4}},
+                                                     {Real{0.675}, Real{0.95}},
+                                                     {Real{0.075},
+       Real{0.95}}};*/
+    static std::vector<std::array<Real, 2>> vertices{
+        {Real{0.5}, Real{0.95}},    {Real{0.65}, Real{0.5}},
+        {Real{0.999}, Real{0.4}},   {Real{0.999}, Real{0.999}},
+        {Real{0.001}, Real{0.999}}, {Real{0.001}, Real{0.4}},
+        {Real{0.35}, Real{0.5}}};
     static std::vector<std::array<int, 2>> edges;
     static auto cut_mesh = std::make_shared<CutMesh>(vertices);
     static MPM mpm(cut_mesh);
-    static bool opt_enable_grid = true;
+    static bool opt_draw_grid = true;
     static bool opt_construct_cut_mesh = true;
-    static bool opt_draw_cut_vertices = false;
-    static bool opt_draw_cut_edges = false;
+    // static bool opt_draw_cut_vertices = false;
+    // static bool opt_draw_cut_edges = false;
     static bool opt_draw_original_lines = true;
     static bool opt_simulation = false;
     static bool adding_line = false;
@@ -444,11 +455,11 @@ static void show_cut_mesh() {
     static auto selected_half_edge = end(cut_mesh->half_edges());
     static auto selected_face = end(cut_mesh->faces());
 
-    ImGui::Checkbox("Enable grid", &opt_enable_grid);
+    ImGui::Checkbox("Draw grid", &opt_draw_grid);
+    ImGui::Checkbox("Draw lines", &opt_draw_original_lines);
     ImGui::Checkbox("Construct cut-mesh", &opt_construct_cut_mesh);
-    ImGui::Checkbox("Draw cut-vertices", &opt_draw_cut_vertices);
-    ImGui::Checkbox("Draw cut-edges", &opt_draw_cut_edges);
-    ImGui::Checkbox("Draw original lines", &opt_draw_original_lines);
+    // ImGui::Checkbox("Draw cut-vertices", &opt_draw_cut_vertices);
+    // ImGui::Checkbox("Draw cut-edges", &opt_draw_cut_edges);
 
     if (!opt_construct_cut_mesh &&
         selected_half_edge != end(cut_mesh->half_edges())) {
@@ -466,11 +477,11 @@ static void show_cut_mesh() {
     } else {
         opt_simulation = false;
     }
-    if (ImGui::Button("Clear cut-mesh")) {
+    /*if (ImGui::Button("Clear cut-mesh")) {
         cut_mesh = std::make_shared<CutMesh>();
         selected_half_edge = end(cut_mesh->half_edges());
         selected_face = end(cut_mesh->faces());
-    }
+    }*/
     ImGui::Text(
         "Mouse Left: drag to add lines,\nMouse Right: click for context menu.");
 
@@ -534,13 +545,13 @@ static void show_cut_mesh() {
 
     if (opt_construct_cut_mesh) {
         *cut_mesh = CutMesh(vertices);
-        selected_half_edge = cut_mesh->half_edges().begin();
+        selected_half_edge = end(cut_mesh->half_edges());
         selected_face = end(cut_mesh->faces());
     }
 
     // Draw grid + all lines in the canvas
     draw_list->PushClipRect(canvas_p0, canvas_p1, true);
-    if (opt_enable_grid) {
+    if (opt_draw_grid) {
         const float grid_step = canvas_width / kGridSize;
         for (int i = 1; i < kGridSize; ++i) {
             draw_list->AddLine(
@@ -585,13 +596,13 @@ static void show_cut_mesh() {
                 IM_COL32(0, 0, 0, 255), 2.0f);
         }
     }
-    if (opt_draw_cut_edges) {
+    /*if (opt_draw_cut_edges) {
         for (const auto& e : cut_mesh->edges()) {
             const auto& v0 = e.half_edge->vertex;
             const auto& v1 = e.half_edge->twin->vertex;
-            /*if (v0->id < n_grid_nodes && v1->id < n_grid_nodes) {
+            *//*if (v0->id < n_grid_nodes && v1->id < n_grid_nodes) {
                 continue;
-            }*/
+            }*//*
             auto pos0 = v0->position * canvas_width;
             auto pos1 = v1->position * canvas_width;
             ImVec2 p0(origin.x + static_cast<float>(pos0.x()),
@@ -600,37 +611,44 @@ static void show_cut_mesh() {
                       static_cast<float>(origin.y + pos1.y()));
             draw_list->AddLine(p0, p1, IM_COL32(0, 0, 0, 255), 2);
         }
-    }
-    if (!opt_construct_cut_mesh &&
-        selected_half_edge != cut_mesh->half_edges().end()) {
-        std::vector<ImVec2> points;
-        auto h = selected_half_edge;
-        do {
-            auto v = h->vertex;
-            points.emplace_back(origin.x + v->position.x() * canvas_width,
-                                origin.y + v->position.y() * canvas_width);
-            h = h->next;
-        } while (h != selected_half_edge);
-        draw_list->AddPolyline(points.data(), static_cast<int>(points.size()),
-                               IM_COL32(0, 255, 0, 255), ImDrawFlags_Closed,
-                               3.0f);
-        const auto& v0 = selected_half_edge->vertex;
-        const auto& v1 = selected_half_edge->twin->vertex;
-        draw_list->AddLine(
-            ImVec2(
-                origin.x + static_cast<float>(v0->position.x()) * canvas_width,
-                origin.y + static_cast<float>(v0->position.y()) * canvas_width),
-            ImVec2(
-                origin.x + static_cast<float>(v1->position.x()) * canvas_width,
-                origin.y + static_cast<float>(v1->position.y()) * canvas_width),
-            IM_COL32(0, 0, 255, 255), 4.0f);
+    }*/
+    if (!opt_construct_cut_mesh) {
+        if (selected_half_edge != end(cut_mesh->half_edges())) {
+            std::vector<ImVec2> points;
+            auto h = selected_half_edge;
+            do {
+                auto v = h->vertex;
+                points.emplace_back(origin.x + v->position.x() * canvas_width,
+                                    origin.y + v->position.y() * canvas_width);
+                h = h->next;
+            } while (h != selected_half_edge);
+            draw_list->AddPolyline(
+                points.data(), static_cast<int>(points.size()),
+                IM_COL32(0, 255, 0, 255), ImDrawFlags_Closed, 3.0f);
+            const auto& v0 = selected_half_edge->vertex;
+            const auto& v1 = selected_half_edge->twin->vertex;
+            draw_list->AddLine(
+                ImVec2(origin.x +
+                           static_cast<float>(v0->position.x()) * canvas_width,
+                       origin.y +
+                           static_cast<float>(v0->position.y()) * canvas_width),
+                ImVec2(origin.x +
+                           static_cast<float>(v1->position.x()) * canvas_width,
+                       origin.y +
+                           static_cast<float>(v1->position.y()) * canvas_width),
+                IM_COL32(0, 0, 255, 255), 4.0f);
+        }
         if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             auto face = cut_mesh->get_enclosing_face(
                 {mouse_pos_in_grid[0], mouse_pos_in_grid[1]});
-            selected_half_edge = face->half_edge;
+            if (face == selected_half_edge->face) {
+                selected_half_edge = end(cut_mesh->half_edges());
+            } else {
+                selected_half_edge = face->half_edge;
+            }
         }
     }
-    if (opt_draw_cut_vertices) {
+    /*if (opt_draw_cut_vertices) {
         for (const auto& v : cut_mesh->vertices()) {
             draw_list->AddCircleFilled(
                 ImVec2(static_cast<float>(origin.x + v.position.x()) *
@@ -639,7 +657,7 @@ static void show_cut_mesh() {
                            canvas_width),
                 4, IM_COL32(255, 0, 0, 255));
         }
-    }
+    }*/
     if (opt_simulation) {
         if (!simulating) {
             mpm = MPM(cut_mesh);
@@ -680,9 +698,9 @@ int main(int, char**) {
     // Create window with Vulkan graphics context
     auto window_flags = static_cast<SDL_WindowFlags>(
         SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow(
-        "Dear ImGui SDL2+Vulkan example", SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    SDL_Window* window =
+        SDL_CreateWindow("Dear ImGui SDL2+Vulkan", SDL_WINDOWPOS_CENTERED,
+                         SDL_WINDOWPOS_CENTERED, 800, 800, window_flags);
 
     ImVector<const char*> extensions;
     uint32_t extensions_count = 0;

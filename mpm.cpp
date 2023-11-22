@@ -28,19 +28,20 @@ auto svd(const Mat2& m) {
     return std::tuple{svd.matrixU(), svd.singularValues(), svd.matrixV()};
 }
 
-bool collision(const Vec2& px, Vec2& pv, const Vec2& o, const Vec2& d) {
+Real collision_time(const Vec2& px, const Vec2& pv, const Vec2& o,
+                    const Vec2& d) {
+    constexpr Real kInf = std::numeric_limits<Real>::infinity();
     auto denominator = d.x() * pv.y() - d.y() * pv.x();
-    if (denominator == 0) return false;
+    if (denominator == 0) return kInf;
     Real t1 =
         (px.x() * pv.y() - px.y() * pv.x() + o.y() * pv.x() - o.x() * pv.y()) /
         denominator;
-    if (t1 < -kMargin / kDeltaX || t1 > 1 + kMargin / kDeltaX) return false;
+    if (t1 < 0 || t1 > 1) return kInf;
     Real t0 =
         (o.y() * d.x() - o.x() * d.y() + px.x() * d.y() - px.y() * d.x()) /
         denominator;
-    if (t0 < 0 || (t0 - kDeltaT) * pv.norm() > kMargin) return false;
-    pv *= std::max(Real{0}, t0 - kMargin / pv.norm()) / kDeltaT;
-    return true;
+    if (t0 < 0) return kInf;
+    return t0;
 }
 
 }  // namespace
@@ -170,23 +171,35 @@ void MPM::update() {
         p.M_inv = new_M.inverse();
         p.C = new_C * new_M.inverse();
 
+        bool colliding = true;
         Vec2 old_x = p.x;
         for (int i = 0; i < 8; ++i) {
-            bool colliding = false;
+            Real min_t = std::numeric_limits<Real>::infinity();
+            Vec2 normal = Vec2::Zero();
+            Real distance = std::numeric_limits<Real>::infinity();
             for (int id : enclosing_face->neighbor_boundaries) {
                 auto h = begin(cut_mesh_->half_edges()) + id;
                 if (p.v.dot(h->normal) > 0) continue;
                 auto p0 = h->vertex->position;
                 auto p1 = h->twin->vertex->position;
-                if (collision(p.x, p.v, p0, p1 - p0)) {
-                    colliding = true;
-                    p.x += p.v * kDeltaT;
-                    p.v = 2 * kMargin * h->normal / kDeltaT;
+                auto t = collision_time(p.x, p.v, p0, p1 - p0);
+                if (t < min_t) {
+                    min_t = t;
+                    normal = h->normal;
+                    distance = (p.x - p0).dot(normal);
                 }
             }
-            if (!colliding) break;
+            if (min_t > kDeltaT) {
+                colliding = false;
+                break;
+            }
+            p.x +=
+                p.v * min_t * std::max(Real{0}, distance - kMargin) / distance;
+            p.v = kMargin / kDeltaT * normal;
         }
-        p.x += p.v * kDeltaT;
+        if (!colliding) {
+            p.x += p.v * kDeltaT;
+        }
         p.v = (p.x - old_x) / kDeltaT;
     }
 }
