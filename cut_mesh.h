@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <iostream>
+#include <memory>
 #include <vector>
 
 #include "mpm_config.h"
