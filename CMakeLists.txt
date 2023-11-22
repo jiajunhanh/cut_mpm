@@ -35,4 +35,5 @@ target_include_directories(mandoline2d PRIVATE ${PROJECT_SOURCE_DIR}/deps/sdl/in
 target_compile_options(mandoline2d PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/W3 /WX /wd4819>
         $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
+        #$<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
 )

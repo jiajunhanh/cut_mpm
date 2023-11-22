@@ -24,7 +24,7 @@ class MPM {
         std::vector<CutMesh::FaceRef> faces;
     };
 
-    explicit MPM(const std::shared_ptr<CutMesh>& cut_mesh_);
+    MPM(const std::shared_ptr<CutMesh>& cut_mesh, int quality, int material);
     void initialize();
     void update();
     [[nodiscard]] const std::vector<Particle>& particles() const {
@@ -32,6 +32,18 @@ class MPM {
     }
 
    private:
+    int quality_ = 8;
+    int grid_size_ = 8 * quality_;
+    int row_size_ = grid_size_ + 1;
+    int n_particles_ = 32 * quality_ * quality_;
+    int material_ = 0;
+    Real delta_t_ = Real{2e-3} / static_cast<Real>(quality_);
+    Real delta_x_ = Real{1.0} / static_cast<Real>(grid_size_);
+    Real margin_ = delta_x_ / 32;
+    Real particle_volume_ = delta_x_ * delta_x_ * Real{0.25};
+    Real particle_density_ = 1.0;
+    Real k_particle_mass_ = particle_volume_ * particle_density_;
+
     std::shared_ptr<CutMesh> cut_mesh_;
     std::vector<Particle> particles_;
     std::vector<GridNode> nodes_;

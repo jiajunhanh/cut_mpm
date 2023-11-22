@@ -3,6 +3,7 @@
 #include <Eigen/Dense>
 #include <iostream>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "mpm_config.h"
@@ -73,21 +74,21 @@ class CutMesh {
     };
 
     CutMesh() = default;
-    explicit CutMesh(std::vector<std::array<Real, 2>> vertices);
+    CutMesh(std::vector<std::array<Real, 2>> vertices, int quality);
 
     auto& half_edges() { return half_edges_; }
     auto& vertices() { return vertices_; }
     auto& edges() { return edges_; }
     auto& faces() { return faces_; }
     auto& grids() { return grids_; }
-    Grid& grid(int r, int c) { return grids_[r * kGridSize + c]; }
+    Grid& grid(int r, int c) { return grids_[r * grid_size_ + c]; }
     [[nodiscard]] const auto& half_edges() const { return half_edges_; }
     [[nodiscard]] const auto& vertices() const { return vertices_; }
     [[nodiscard]] const auto& edges() const { return edges_; }
     [[nodiscard]] const auto& faces() const { return faces_; }
     [[nodiscard]] const auto& grids() const { return grids_; }
     [[nodiscard]] const Grid& grid(int r, int c) const {
-        return grids_[r * kGridSize + c];
+        return grids_[r * grid_size_ + c];
     }
 
     HalfEdgeRef emplace_half_edge();
@@ -105,6 +106,31 @@ class CutMesh {
     void calculate_node_normals();
 
    private:
+    struct CutVertex {
+        int c[2] = {};
+        Real q[2] = {};
+        bool b[2] = {};
+
+        [[nodiscard]] Real coord(int d) const {
+            return static_cast<Real>(c[d]) + q[d];
+        }
+    };
+
+    struct CutEdge {
+       public:
+        int i = 0;
+        int j = 0;
+        bool is_boundary = false;
+        CutEdge(int i_, int j_, bool is_boundary_)
+            : i(i_), j(j_), is_boundary(is_boundary_) {}
+    };
+
+    int grid_size_ = 0;
+    int row_size_ = 0;
+    int n_grid_nodes_ = 0;
+    Real delta_x_ = 0;
+    Real margin_ = 0;
+
     std::vector<HalfEdge> half_edges_;
     std::vector<Vertex> vertices_;
     std::vector<Edge> edges_;
@@ -114,4 +140,15 @@ class CutMesh {
     // std::stack<VertexRef> recycled_vertices_;
     // std::stack<EdgeRef> recycled_edges_;
     // std::stack<FaceRef> recycled_faces_;
+
+    void lerp(CutVertex& v, const CutVertex& vi, const CutVertex& vj, Real t,
+              int d) const;
+    void add_grid_edges(std::vector<CutVertex>& cut_vertices,
+                        std::vector<CutEdge>& cut_edges,
+                        const std::unordered_set<uint64_t>& edge_hash) const;
+    std::pair<std::vector<CutVertex>, std::vector<CutEdge>>
+    compute_cut_vertices_and_edges(
+        const std::vector<std::array<Real, 2>>& vertices);
+    [[nodiscard]] bool is_neighbor_face(CutMesh::FaceRef face0,
+                                        CutMesh::FaceRef face1) const;
 };

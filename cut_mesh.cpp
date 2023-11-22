@@ -5,222 +5,14 @@
 #include <queue>
 #include <unordered_set>
 
-namespace {
+CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices, int quality)
+    : grid_size_(static_cast<int>(std::pow(2, quality - 1)) * 8),
+      row_size_(grid_size_ + 1),
+      n_grid_nodes_(row_size_ * row_size_),
+      delta_x_(Real{1.0} / static_cast<Real>(grid_size_)),
+      margin_(delta_x_ / 32)
 
-constexpr int kGridNodesNumber = kRowSize * kRowSize;
-
-struct Vertex {
-    int c[2] = {};
-    Real q[2] = {};
-    bool b[2] = {};
-
-    [[nodiscard]] Real coord(int d) const {
-        return static_cast<Real>(c[d]) + q[d];
-    }
-};
-
-struct Edge {
-   public:
-    int i = 0;
-    int j = 0;
-    bool is_boundary = false;
-    Edge(int i_, int j_, bool is_boundary_)
-        : i(i_), j(j_), is_boundary(is_boundary_) {}
-};
-
-void lerp(Vertex& v, const Vertex& vi, const Vertex& vj, Real t, int d) {
-    Real coord_i = vi.coord(d);
-    Real coord_j = vj.coord(d);
-    Real coord = coord_i + (coord_j - coord_i) * t;
-    v.c[d] = static_cast<int>(std::floor(coord));
-    v.q[d] = coord - std::floor(coord);
-    v.b[d] = false;
-    if (v.q[d] <= kMargin) {
-        v.q[d] = 0;
-        v.b[d] = true;
-    }
-}
-
-void add_grid_edges(std::vector<Vertex>& cut_vertices,
-                    std::vector<Edge>& cut_edges,
-                    const std::unordered_set<uint64_t>& edge_hash) {
-    auto add_grid_edge = [&](int i, int j) {
-        if (edge_hash.count((static_cast<uint64_t>(i) << 32) |
-                            static_cast<uint64_t>(j)))
-            return;
-        if (edge_hash.count((static_cast<uint64_t>(j) << 32) |
-                            static_cast<uint64_t>(i)))
-            return;
-        cut_edges.emplace_back(i, j, false);
-    };
-    std::vector<int> grid_cut_vertices[kGridSize * kGridSize][2];
-    for (int i = kGridNodesNumber, size = static_cast<int>(cut_vertices.size());
-         i < size; ++i) {
-        const Vertex& v = cut_vertices[i];
-        for (int d = 0; d < 2; ++d) {
-            if (v.b[d]) {
-                grid_cut_vertices[v.c[1] * kGridSize + v.c[0]][d ^ 1]
-                    .emplace_back(i);
-            }
-        }
-    }
-    for (int r = 0; r < kGridSize; ++r) {
-        for (int c = 0; c < kGridSize; ++c) {
-            int node_i = r * kRowSize + c;
-            for (int d = 0; d < 2; ++d) {
-                auto& v = grid_cut_vertices[r * kGridSize + c][d];
-                int node_j = node_i + d * kGridSize + 1;
-                if (v.empty()) {
-                    add_grid_edge(node_i, node_j);
-                    continue;
-                }
-                std::sort(begin(v), end(v), [&](int i, int j) {
-                    return cut_vertices[i].q[d] < cut_vertices[j].q[d];
-                });
-                add_grid_edge(node_i, v.front());
-                for (int i = 0, size = static_cast<int>(v.size()); i < size - 1;
-                     ++i) {
-                    add_grid_edge(v[i], v[i + 1]);
-                }
-                add_grid_edge(v.back(), node_j);
-            }
-        }
-    }
-    for (int i = 0; i < kGridSize; ++i) {
-        add_grid_edge(i * kRowSize + kGridSize, (i + 1) * kRowSize + kGridSize);
-        add_grid_edge(kGridSize * kRowSize + i, kGridSize * kRowSize + i + 1);
-    }
-}
-
-std::pair<std::vector<Vertex>, std::vector<Edge>>
-compute_cut_vertices_and_edges(
-    const std::vector<std::array<Real, 2>>& vertices) {
-    std::vector<Vertex> cut_vertices;
-    for (int r = 0; r < kRowSize; ++r) {
-        for (int c = 0; c < kRowSize; ++c) {
-            Vertex v{};
-            v.c[0] = c;
-            v.c[1] = r;
-            v.b[0] = v.b[1] = true;
-            cut_vertices.emplace_back(v);
-        }
-    }
-    std::vector<int> vertex_ids;
-    for (const auto& v : vertices) {
-        Vertex cut_vertex;
-        for (int d = 0; d < 2; ++d) {
-            Real x = v[d] * kGridSize;
-            cut_vertex.c[d] = static_cast<int>(std::floor(x));
-            cut_vertex.q[d] = x - std::floor(x);
-            cut_vertex.b[d] = false;
-            if (cut_vertex.q[d] <= kMargin) {
-                cut_vertex.q[d] = 0;
-                cut_vertex.b[d] = true;
-            }
-        }
-        if (cut_vertex.b[0] && cut_vertex.b[1]) {
-            vertex_ids.emplace_back(cut_vertex.c[1] * kRowSize +
-                                    cut_vertex.c[0]);
-            continue;
-        }
-        cut_vertices.emplace_back(cut_vertex);
-        vertex_ids.emplace_back(static_cast<int>(cut_vertices.size()) - 1);
-    }
-    std::vector<Edge> cut_edges;
-    std::unordered_set<uint64_t> edge_hash;
-    for (int i = 0, vertex_ids_size = static_cast<int>(vertex_ids.size());
-         i < vertex_ids_size; ++i) {
-        auto j = (i + 1) % vertex_ids_size;
-        auto id_i = vertex_ids[i];
-        auto id_j = vertex_ids[j];
-        std::vector<std::pair<Real, int>> intersection_points;
-        const Vertex vi = cut_vertices[id_i];
-        const Vertex vj = cut_vertices[id_j];
-        for (int d = 0; d < 2; ++d) {
-            int z_min;
-            int z_max;
-            if (vi.c[d] < vj.c[d] ||
-                (vi.c[d] == vj.c[d] && vi.q[d] < vj.q[d])) {
-                z_min = vi.b[d] ? vi.c[d] : vi.c[d] + 1;
-                z_max = vj.c[d];
-            } else {
-                z_min = vj.b[d] ? vj.c[d] : vj.c[d] + 1;
-                z_max = vi.c[d];
-            }
-            Real distance =
-                static_cast<Real>(vj.c[d] - vi.c[d]) + (vj.q[d] - vi.q[d]);
-            if (distance == 0) continue;
-            for (int z = z_min; z <= z_max; ++z) {
-                Real t = (static_cast<Real>(z - vi.c[d]) - vi.q[d]) / distance;
-                if (t <= 0 || t >= 1) continue;
-                Vertex cut_v;
-                lerp(cut_v, vi, vj, t, d ^ 1);
-                cut_v.c[d] = z;
-                cut_v.q[d] = 0;
-                cut_v.b[d] = true;
-                if (cut_v.b[d ^ 1]) {
-                    auto grid_id = cut_v.c[1] * kRowSize + cut_v.c[0];
-                    intersection_points.emplace_back(t, grid_id);
-                    continue;
-                }
-                cut_vertices.emplace_back(cut_v);
-                intersection_points.emplace_back(
-                    t, static_cast<int>(cut_vertices.size()) - 1);
-            }
-        }
-        intersection_points.emplace_back(Real{0}, id_i);
-        intersection_points.emplace_back(Real{1}, id_j);
-        std::sort(
-            begin(intersection_points), end(intersection_points),
-            [](const auto& a, const auto& b) { return a.first < b.first; });
-        for (int k = 0, size = static_cast<int>(intersection_points.size());
-             k + 1 < size; ++k) {
-            auto id0 = intersection_points[k].second;
-            auto id1 = intersection_points[k + 1].second;
-            if (id0 == id1) {
-                continue;
-            }
-            cut_edges.emplace_back(id0, id1, true);
-            edge_hash.emplace((static_cast<uint64_t>(id0) << 32) |
-                              static_cast<uint64_t>(id1));
-        }
-    }
-    add_grid_edges(cut_vertices, cut_edges, edge_hash);
-    return {cut_vertices, cut_edges};
-}
-
-bool is_neighbor_face(CutMesh::FaceRef face0, CutMesh::FaceRef face1) {
-    auto min_x = std::numeric_limits<Real>::max();
-    auto max_x = std::numeric_limits<Real>::min();
-    auto min_y = std::numeric_limits<Real>::max();
-    auto max_y = std::numeric_limits<Real>::min();
-
-    auto h = face0->half_edge;
-    do {
-        auto p = h->vertex->position;
-        min_x = std::min(min_x, p.x());
-        max_x = std::max(max_x, p.x());
-        min_y = std::min(min_y, p.y());
-        max_y = std::max(max_y, p.y());
-    } while ((h = h->next) != face0->half_edge);
-
-    min_x -= kKernelRange * kDeltaX;
-    max_x += kKernelRange * kDeltaX;
-    min_y -= kKernelRange * kDeltaX;
-    max_y += kKernelRange * kDeltaX;
-
-    h = face1->half_edge;
-    do {
-        auto p = h->vertex->position;
-        if (p.x() > min_x && p.x() < max_x && p.y() > min_y && p.y() < max_y)
-            return true;
-    } while ((h = h->next) != face1->half_edge);
-    return false;
-}
-
-}  // namespace
-
-CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices) {
+{
     Real orientation = 0;
     for (int i = 0, vertices_size = static_cast<int>(vertices.size());
          i < vertices_size; ++i) {
@@ -244,7 +36,7 @@ CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices) {
             // v->on_edge[d] = cut_vertex.b[d];
         }
         // v->grid_id = cut_vertex.c[1] * kGridSize + cut_vertex.c[0];
-        v->position /= kGridSize;
+        v->position /= static_cast<Real>(grid_size_);
     }
 
     half_edges_.reserve(2 * cut_edges.size());
@@ -320,11 +112,11 @@ CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices) {
         } while ((h = h->next) != half_edge);
     }
 
-    grids_.resize(kGridSize * kGridSize);
+    grids_.resize(grid_size_ * grid_size_);
     for (auto face = begin(faces_), faces_end = end(faces_); face != faces_end;
          ++face) {
         face->calculate_center();
-        Vec2 center = face->center * kGridSize;
+        Vec2 center = face->center * grid_size_;
         int r = static_cast<int>(std::floor(center.y()));
         int c = static_cast<int>(std::floor(center.x()));
         grid(r, c).faces.emplace_back(face);
@@ -335,17 +127,19 @@ CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices) {
         } while ((h = h->next) != half_edge);
     }
 
-    for (int r = 0; r < kGridSize; ++r) {
-        for (int c = 0; c < kGridSize; ++c) {
-            grid(r, c).vertex = begin(vertices_) + (r * kRowSize + c);
+    for (int r = 0; r < grid_size_; ++r) {
+        for (int c = 0; c < grid_size_; ++c) {
+            grid(r, c).vertex = begin(vertices_) + (r * row_size_ + c);
         }
     }
 }
 
 CutMesh::FaceRef CutMesh::get_enclosing_face(Vec2 x) const {
     while (true) {
-        auto r = static_cast<int>(std::floor(x.y() * kGridSize));
-        auto c = static_cast<int>(std::floor(x.x() * kGridSize));
+        auto r =
+            static_cast<int>(std::floor(x.y() * static_cast<Real>(grid_size_)));
+        auto c =
+            static_cast<int>(std::floor(x.x() * static_cast<Real>(grid_size_)));
         for (const auto& face : grid(r, c).faces) {
             if (face->enclose(x)) return face;
         }
@@ -432,13 +226,208 @@ void CutMesh::calculate_node_normals() {
             auto v = begin(vertices_) + neighbor_nodes[i];
             if (!v->on_boundary) continue;
             Vec2 d = vertex.position - v->position;
-            if (d.norm() > kDeltaX * 0.5) continue;
+            if (d.norm() > delta_x_ * 0.5) continue;
             auto w = interpolate(d);
             vertex.normal += w * v->normal;
             w_sum += w;
         }
         if (w_sum > 0) vertex.normal /= w_sum;
     }
+}
+
+void CutMesh::lerp(CutVertex& v, const CutVertex& vi, const CutVertex& vj,
+                   Real t, int d) const {
+    Real coord_i = vi.coord(d);
+    Real coord_j = vj.coord(d);
+    Real coord = coord_i + (coord_j - coord_i) * t;
+    v.c[d] = static_cast<int>(std::floor(coord));
+    v.q[d] = coord - std::floor(coord);
+    v.b[d] = false;
+    if (v.q[d] <= margin_) {
+        v.q[d] = 0;
+        v.b[d] = true;
+    }
+}
+
+void CutMesh::add_grid_edges(
+    std::vector<CutVertex>& cut_vertices, std::vector<CutEdge>& cut_edges,
+    const std::unordered_set<uint64_t>& edge_hash) const {
+    auto add_grid_edge = [&](int i, int j) {
+        if (edge_hash.count((static_cast<uint64_t>(i) << 32) |
+                            static_cast<uint64_t>(j)))
+            return;
+        if (edge_hash.count((static_cast<uint64_t>(j) << 32) |
+                            static_cast<uint64_t>(i)))
+            return;
+        cut_edges.emplace_back(i, j, false);
+    };
+    std::vector<std::vector<std::vector<int>>> grid_cut_vertices(
+        grid_size_ * grid_size_, std::vector<std::vector<int>>(2));
+    for (int i = n_grid_nodes_, size = static_cast<int>(cut_vertices.size());
+         i < size; ++i) {
+        const CutVertex& v = cut_vertices[i];
+        for (int d = 0; d < 2; ++d) {
+            if (v.b[d]) {
+                grid_cut_vertices[v.c[1] * grid_size_ + v.c[0]][d ^ 1]
+                    .emplace_back(i);
+            }
+        }
+    }
+    for (int r = 0; r < grid_size_; ++r) {
+        for (int c = 0; c < grid_size_; ++c) {
+            int node_i = r * row_size_ + c;
+            for (int d = 0; d < 2; ++d) {
+                auto& v = grid_cut_vertices[r * grid_size_ + c][d];
+                int node_j = node_i + d * grid_size_ + 1;
+                if (v.empty()) {
+                    add_grid_edge(node_i, node_j);
+                    continue;
+                }
+                std::sort(begin(v), end(v), [&](int i, int j) {
+                    return cut_vertices[i].q[d] < cut_vertices[j].q[d];
+                });
+                add_grid_edge(node_i, v.front());
+                for (int i = 0, size = static_cast<int>(v.size()); i < size - 1;
+                     ++i) {
+                    add_grid_edge(v[i], v[i + 1]);
+                }
+                add_grid_edge(v.back(), node_j);
+            }
+        }
+    }
+    for (int i = 0; i < grid_size_; ++i) {
+        add_grid_edge(i * row_size_ + grid_size_,
+                      (i + 1) * row_size_ + grid_size_);
+        add_grid_edge(grid_size_ * row_size_ + i,
+                      grid_size_ * row_size_ + i + 1);
+    }
+}
+
+std::pair<std::vector<CutMesh::CutVertex>, std::vector<CutMesh::CutEdge>>
+CutMesh::compute_cut_vertices_and_edges(
+    const std::vector<std::array<Real, 2>>& vertices) {
+    std::vector<CutVertex> cut_vertices;
+    for (int r = 0; r < row_size_; ++r) {
+        for (int c = 0; c < row_size_; ++c) {
+            CutVertex v{};
+            v.c[0] = c;
+            v.c[1] = r;
+            v.b[0] = v.b[1] = true;
+            cut_vertices.emplace_back(v);
+        }
+    }
+    std::vector<int> vertex_ids;
+    for (const auto& v : vertices) {
+        CutVertex cut_vertex;
+        for (int d = 0; d < 2; ++d) {
+            Real x = v[d] * static_cast<Real>(grid_size_);
+            cut_vertex.c[d] = static_cast<int>(std::floor(x));
+            cut_vertex.q[d] = x - std::floor(x);
+            cut_vertex.b[d] = false;
+            if (cut_vertex.q[d] <= margin_) {
+                cut_vertex.q[d] = 0;
+                cut_vertex.b[d] = true;
+            }
+        }
+        if (cut_vertex.b[0] && cut_vertex.b[1]) {
+            vertex_ids.emplace_back(cut_vertex.c[1] * row_size_ +
+                                    cut_vertex.c[0]);
+            continue;
+        }
+        cut_vertices.emplace_back(cut_vertex);
+        vertex_ids.emplace_back(static_cast<int>(cut_vertices.size()) - 1);
+    }
+    std::vector<CutEdge> cut_edges;
+    std::unordered_set<uint64_t> edge_hash;
+    for (int i = 0, vertex_ids_size = static_cast<int>(vertex_ids.size());
+         i < vertex_ids_size; ++i) {
+        auto j = (i + 1) % vertex_ids_size;
+        auto id_i = vertex_ids[i];
+        auto id_j = vertex_ids[j];
+        std::vector<std::pair<Real, int>> intersection_points;
+        const CutVertex vi = cut_vertices[id_i];
+        const CutVertex vj = cut_vertices[id_j];
+        for (int d = 0; d < 2; ++d) {
+            int z_min;
+            int z_max;
+            if (vi.c[d] < vj.c[d] ||
+                (vi.c[d] == vj.c[d] && vi.q[d] < vj.q[d])) {
+                z_min = vi.b[d] ? vi.c[d] : vi.c[d] + 1;
+                z_max = vj.c[d];
+            } else {
+                z_min = vj.b[d] ? vj.c[d] : vj.c[d] + 1;
+                z_max = vi.c[d];
+            }
+            Real distance =
+                static_cast<Real>(vj.c[d] - vi.c[d]) + (vj.q[d] - vi.q[d]);
+            if (distance == 0) continue;
+            for (int z = z_min; z <= z_max; ++z) {
+                Real t = (static_cast<Real>(z - vi.c[d]) - vi.q[d]) / distance;
+                if (t <= 0 || t >= 1) continue;
+                CutVertex cut_v;
+                lerp(cut_v, vi, vj, t, d ^ 1);
+                cut_v.c[d] = z;
+                cut_v.q[d] = 0;
+                cut_v.b[d] = true;
+                if (cut_v.b[d ^ 1]) {
+                    auto grid_id = cut_v.c[1] * row_size_ + cut_v.c[0];
+                    intersection_points.emplace_back(t, grid_id);
+                    continue;
+                }
+                cut_vertices.emplace_back(cut_v);
+                intersection_points.emplace_back(
+                    t, static_cast<int>(cut_vertices.size()) - 1);
+            }
+        }
+        intersection_points.emplace_back(Real{0}, id_i);
+        intersection_points.emplace_back(Real{1}, id_j);
+        std::sort(
+            begin(intersection_points), end(intersection_points),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+        for (int k = 0, size = static_cast<int>(intersection_points.size());
+             k + 1 < size; ++k) {
+            auto id0 = intersection_points[k].second;
+            auto id1 = intersection_points[k + 1].second;
+            if (id0 == id1) {
+                continue;
+            }
+            cut_edges.emplace_back(id0, id1, true);
+            edge_hash.emplace((static_cast<uint64_t>(id0) << 32) |
+                              static_cast<uint64_t>(id1));
+        }
+    }
+    add_grid_edges(cut_vertices, cut_edges, edge_hash);
+    return {cut_vertices, cut_edges};
+}
+
+bool CutMesh::is_neighbor_face(CutMesh::FaceRef face0,
+                               CutMesh::FaceRef face1) const {
+    auto min_x = std::numeric_limits<Real>::max();
+    auto max_x = std::numeric_limits<Real>::min();
+    auto min_y = std::numeric_limits<Real>::max();
+    auto max_y = std::numeric_limits<Real>::min();
+
+    auto h = face0->half_edge;
+    do {
+        auto p = h->vertex->position;
+        min_x = std::min(min_x, p.x());
+        max_x = std::max(max_x, p.x());
+        min_y = std::min(min_y, p.y());
+        max_y = std::max(max_y, p.y());
+    } while ((h = h->next) != face0->half_edge);
+
+    min_x -= kKernelRange * delta_x_;
+    max_x += kKernelRange * delta_x_;
+    min_y -= kKernelRange * delta_x_;
+    max_y += kKernelRange * delta_x_;
+
+    h = face1->half_edge;
+    do {
+        auto p = h->vertex->position;
+        if (p.x() > min_x && p.x() < max_x && p.y() > min_y && p.y() < max_y)
+            return true;
+    } while ((h = h->next) != face1->half_edge);
+    return false;
 }
 
 void CutMesh::Face::calculate_center() {
@@ -449,5 +438,5 @@ void CutMesh::Face::calculate_center() {
         center += h->vertex->position;
         ++cnt;
     } while ((h = h->next) != half_edge);
-    center /= cnt;
+    center /= static_cast<Real>(cnt);
 }
