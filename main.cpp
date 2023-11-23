@@ -418,14 +418,14 @@ static void show_cut_mesh() {
         return;
     }
 
-    constexpr Real gap = 0.005;
+    constexpr Real gap = 0.00039;
     static std::vector<std::vector<std::array<Real, 2>>> scenarios{
         std::vector<std::array<Real, 2>>{},
         std::vector<std::array<Real, 2>>{{Real{0.3} - gap / 2, Real{0.6}},
-                                         {Real{0.01}, Real{0.1}},
-                                         {Real{0.01}, Real{0.99}},
-                                         {Real{0.99}, Real{0.99}},
-                                         {Real{0.99}, Real{0.1}},
+                                         {Real{0.001}, Real{0.1}},
+                                         {Real{0.001}, Real{0.999}},
+                                         {Real{0.999}, Real{0.999}},
+                                         {Real{0.999}, Real{0.1}},
                                          {Real{0.3} + gap / 2, Real{0.6}},
                                          {Real{0.95}, Real{0.95}},
                                          {Real{0.05}, Real{0.95}}},
@@ -433,12 +433,17 @@ static void show_cut_mesh() {
                                          {Real{0.325}, Real{0.95}},
                                          {Real{0.425}, Real{0.95}}},
         std::vector<std::array<Real, 2>>{{Real{0.5}, Real{0.95}},
-                                         {Real{0.65}, Real{0.5}},
+                                         {Real{0.6}, Real{0.5}},
                                          {Real{0.999}, Real{0.4}},
                                          {Real{0.999}, Real{0.999}},
                                          {Real{0.001}, Real{0.999}},
                                          {Real{0.001}, Real{0.4}},
-                                         {Real{0.35}, Real{0.5}}}};
+                                         {Real{0.4}, Real{0.5}}},
+        std::vector<std::array<Real, 2>>{{Real{0.075}, Real{0.4}},
+                                         {Real{0.375}, Real{0.9}},
+                                         {Real{0.675}, Real{0.4}},
+                                         {Real{0.675}, Real{0.95}},
+                                         {Real{0.075}, Real{0.95}}}};
     static int quality = 4;
     static int boundary = 1;
     static int material = 0;
@@ -459,7 +464,9 @@ static void show_cut_mesh() {
     ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.25f);
     ImGui::SliderInt("Quality", &quality, 1, 8);
     ImGui::SameLine();
-    const char* boundaries[] = {"None", "Narrow gap", "Cutting", "Sharp angle"};
+    const char* boundaries[] = {"None", "Narrow gap", "Cutting",
+                                "Sharp angle (liquid)",
+                                "Sharp angle (elastic)"};
     ImGui::Combo("Boundary", &boundary, boundaries, IM_ARRAYSIZE(boundaries));
     ImGui::PopItemWidth();
     ImGui::Checkbox("Draw grid", &opt_draw_grid);
@@ -469,6 +476,7 @@ static void show_cut_mesh() {
     // ImGui::Checkbox("Draw cut-vertices", &opt_draw_cut_vertices);
     // ImGui::Checkbox("Draw cut-edges", &opt_draw_cut_edges);
 
+    if (opt_simulation) opt_construct_cut_mesh = false;
     if (!opt_construct_cut_mesh &&
         selected_half_edge != end(cut_mesh->half_edges())) {
         ImGui::SameLine();
@@ -480,15 +488,12 @@ static void show_cut_mesh() {
             selected_half_edge = selected_half_edge->twin;
         }
     }
-    if (!opt_construct_cut_mesh) {
-        ImGui::Checkbox("Simulation", &opt_simulation);
-        ImGui::SameLine();
-        const char* materials[] = {"Liquid", "Elastic"};
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.25f);
-        ImGui::Combo("Material", &material, materials, IM_ARRAYSIZE(materials));
-    } else {
-        opt_simulation = false;
-    }
+    ImGui::Checkbox("Simulation", &opt_simulation);
+    ImGui::SameLine();
+    const char* materials[] = {"Liquid", "Elastic"};
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.25f);
+    ImGui::Combo("Material", &material, materials, IM_ARRAYSIZE(materials));
+    // if (opt_construct_cut_mesh) opt_simulation = false;
     /*if (ImGui::Button("Clear cut-mesh")) {
         cut_mesh = std::make_shared<CutMesh>();
         selected_half_edge = end(cut_mesh->half_edges());
@@ -721,7 +726,7 @@ int main(int, char**) {
         SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window =
         SDL_CreateWindow("Dear ImGui SDL2+Vulkan", SDL_WINDOWPOS_CENTERED,
-                         SDL_WINDOWPOS_CENTERED, 800, 800, window_flags);
+                         SDL_WINDOWPOS_CENTERED, 655, 800, window_flags);
 
     ImVector<const char*> extensions;
     uint32_t extensions_count = 0;

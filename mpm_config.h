@@ -9,10 +9,11 @@ using Real = double;
 // constexpr Real kDeltaT = 2e-3 / kQuality;
 // constexpr Real kDeltaX = 1.0 / kGridSize;
 constexpr Real kKernelRange = 1.5;
+constexpr Real kInf = std::numeric_limits<Real>::infinity();
 // constexpr Real kMargin = kDeltaX / 32;
 //  constexpr Real kInvDeltaX = kGridSize;
 
-// using Vec2i = Eigen::Vector2i;
+using Vec2i = Eigen::Vector2i;
 using Mat23 = Eigen::Matrix<Real, 2, 3>;
 using Vec2 = std::conditional_t<std::is_same_v<Real, float>, Eigen::Vector2f,
                                 Eigen::Vector2d>;

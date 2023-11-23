@@ -71,6 +71,7 @@ class CutMesh {
     struct Grid {
         VertexRef vertex;
         std::vector<FaceRef> faces;
+        bool near_boundary = false;
     };
 
     CutMesh() = default;

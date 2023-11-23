@@ -42,9 +42,15 @@ class MPM {
     Real margin_;
     Real particle_volume_;
     Real particle_density_;
-    Real k_particle_mass_;
+    Real particle_mass_;
+    Real inv_delta_x_;
 
     std::shared_ptr<CutMesh> cut_mesh_;
     std::vector<Particle> particles_;
     std::vector<GridNode> nodes_;
+
+    GridNode& grid(int x, int y) { return nodes_[y * row_size_ + x]; }
+    [[nodiscard]] const GridNode& grid(int x, int y) const {
+        return nodes_[y * row_size_ + x];
+    }
 };

@@ -130,6 +130,14 @@ CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices, int quality)
     for (int r = 0; r < grid_size_; ++r) {
         for (int c = 0; c < grid_size_; ++c) {
             grid(r, c).vertex = begin(vertices_) + (r * row_size_ + c);
+            if (grid(r, c).faces.size() > 1) grid(r, c).near_boundary = true;
+            if (r + 1 < grid_size_ && grid(r + 1, c).faces.size() > 1)
+                grid(r, c).near_boundary = true;
+            if (c + 1 < grid_size_ && grid(r, c + 1).faces.size() > 1)
+                grid(r, c).near_boundary = true;
+            if (c + 1 < grid_size_ && r + 1 < grid_size_ &&
+                grid(r + 1, c + 1).faces.size() > 1)
+                grid(r, c).near_boundary = true;
         }
     }
 }
@@ -140,6 +148,7 @@ CutMesh::FaceRef CutMesh::get_enclosing_face(Vec2 x) const {
             static_cast<int>(std::floor(x.y() * static_cast<Real>(grid_size_)));
         auto c =
             static_cast<int>(std::floor(x.x() * static_cast<Real>(grid_size_)));
+        if (grid(r, c).faces.size() == 1) return grid(r, c).faces[0];
         for (const auto& face : grid(r, c).faces) {
             if (face->enclose(x)) return face;
         }
