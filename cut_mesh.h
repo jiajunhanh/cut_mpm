@@ -55,6 +55,9 @@ class CutMesh {
 
         bool on_boundary = false;
         Vec2 normal = Vec2::Zero();
+
+        bool convex = false;
+        Vec2 get_normal(const Vec2& x) const;
     };
 
     struct Face {
@@ -111,6 +114,7 @@ class CutMesh {
         int c[2] = {};
         Real q[2] = {};
         bool b[2] = {};
+        bool convex = false;
 
         [[nodiscard]] Real coord(int d) const {
             return static_cast<Real>(c[d]) + q[d];

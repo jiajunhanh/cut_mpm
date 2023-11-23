@@ -84,15 +84,19 @@ void MPM::update() {
 #pragma omp parallel for default(none)
     for (Particle& p : particles_) {
         p.F = (Mat2::Identity() + delta_t_ * p.C.block<2, 2>(0, 1)) * p.F;
-        Real hardening_coefficient = 0.5;
-        Real lambda = kLambda0 * hardening_coefficient;
         Real J = p.F.determinant();
-        Mat2 PF = Mat2::Identity() * lambda * J * (J - 1.0);
+        Mat2 PF;
         if (material_ != 0) {
+            Real hardening_coefficient = 0.3;
+            Real lambda = kLambda0 * hardening_coefficient;
             auto [U, V] = svd(p.F);
             Real mu = kMu0 * hardening_coefficient;
-            PF += 2 * mu * (p.F - U * V.transpose()) * p.F.transpose();
+            PF = 2 * mu * (p.F - U * V.transpose()) * p.F.transpose() +
+                 Mat2::Identity() * lambda * J * (J - 1.0);
         } else {
+            Real hardening_coefficient = 1;
+            Real lambda = kLambda0 * hardening_coefficient;
+            PF = Mat2::Identity() * lambda * J * (J - 1.0);
             p.F = Mat2::Identity() * std::sqrt(J);
         }
         Mat3 M_inv = p.M_inv;
@@ -172,7 +176,7 @@ void MPM::update() {
         if (g.m <= 0) continue;
         g.v /= g.m;
         g.v += delta_t_ * kGravity * 30;
-        if (g.vertex->normal != Vec2::Zero()) {
+        if (g.vertex->normal != Vec2::Zero() && !g.vertex->convex) {
             auto dot = g.v.dot(g.vertex->normal);
             dot = std::min(dot, Real{0});
             g.v = g.v - dot * g.vertex->normal;
@@ -239,8 +243,13 @@ void MPM::update() {
                 distance.x() = 1.0;
                 Real weight = weights[i] / weight_sum;
                 distance *= delta_x_;
-                new_v += weight * g.v;
-                new_C += weight * (g.v * distance.transpose());
+                auto v = g.v;
+                if (g.vertex->convex) {
+                    auto normal = g.vertex->get_normal(p.x);
+                    v -= std::min(Real{0}, v.dot(normal)) * normal;
+                }
+                new_v += weight * v;
+                new_C += weight * (v * distance.transpose());
                 new_M += weight * distance * distance.transpose();
             }
         }

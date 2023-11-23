@@ -418,7 +418,7 @@ static void show_cut_mesh() {
         return;
     }
 
-    constexpr Real gap = 0.00039;
+    constexpr Real gap = 0.0039;
     static std::vector<std::vector<std::array<Real, 2>>> scenarios{
         std::vector<std::array<Real, 2>>{},
         std::vector<std::array<Real, 2>>{{Real{0.3} - gap / 2, Real{0.6}},
@@ -445,7 +445,7 @@ static void show_cut_mesh() {
                                          {Real{0.675}, Real{0.95}},
                                          {Real{0.075}, Real{0.95}}}};
     static int quality = 4;
-    static int boundary = 1;
+    static int boundary = 0;
     static int material = 0;
     static std::vector<std::array<Real, 2>> vertices = scenarios[boundary];
     static auto cut_mesh = std::make_shared<CutMesh>(vertices, quality);

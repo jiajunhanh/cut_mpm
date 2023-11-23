@@ -37,6 +37,7 @@ CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices, int quality)
         }
         // v->grid_id = cut_vertex.c[1] * kGridSize + cut_vertex.c[0];
         v->position /= static_cast<Real>(grid_size_);
+        v->convex = cut_vertex.convex;
     }
 
     half_edges_.reserve(2 * cut_edges.size());
@@ -69,8 +70,7 @@ CutMesh::CutMesh(std::vector<std::array<Real, 2>> vertices, int quality)
     }
 
     for (auto& v : vertices_) {
-        if (!v.on_boundary) continue;
-        v.normal.normalize();
+        if (v.on_boundary) v.normal.normalize();
     }
 
     for (int iv = 0, n_vertices = static_cast<int>(vertices_.size());
@@ -237,7 +237,7 @@ void CutMesh::calculate_node_normals() {
             Vec2 d = vertex.position - v->position;
             if (d.norm() > delta_x_ * 0.5) continue;
             auto w = interpolate(d);
-            vertex.normal += w * v->normal;
+            vertex.normal += w * v->get_normal(v->position);
             w_sum += w;
         }
         if (w_sum > 0) vertex.normal /= w_sum;
@@ -326,7 +326,11 @@ CutMesh::compute_cut_vertices_and_edges(
         }
     }
     std::vector<int> vertex_ids;
-    for (const auto& v : vertices) {
+    for (int i = 0, n_vertices = static_cast<int>(vertices.size());
+         i < n_vertices; ++i) {
+        int h = (i + n_vertices - 1) % n_vertices;
+        int j = (i + 1) % n_vertices;
+        auto& v = vertices[i];
         CutVertex cut_vertex;
         for (int d = 0; d < 2; ++d) {
             Real x = v[d] * static_cast<Real>(grid_size_);
@@ -338,9 +342,16 @@ CutMesh::compute_cut_vertices_and_edges(
                 cut_vertex.b[d] = true;
             }
         }
+        auto x0 = v[0] - vertices[h][0];
+        auto y0 = v[1] - vertices[h][1];
+        auto x1 = vertices[j][0] - v[0];
+        auto y1 = vertices[j][1] - v[1];
+        auto cross = x0 * y1 - x1 * y0;
+        if (cross > 0) cut_vertex.convex = true;
         if (cut_vertex.b[0] && cut_vertex.b[1]) {
-            vertex_ids.emplace_back(cut_vertex.c[1] * row_size_ +
-                                    cut_vertex.c[0]);
+            auto grid_id = cut_vertex.c[1] * row_size_ + cut_vertex.c[0];
+            vertex_ids.emplace_back(grid_id);
+            cut_vertices[grid_id].convex = cut_vertex.convex;
             continue;
         }
         cut_vertices.emplace_back(cut_vertex);
@@ -448,4 +459,24 @@ void CutMesh::Face::calculate_center() {
         ++cnt;
     } while ((h = h->next) != half_edge);
     center /= static_cast<Real>(cnt);
+}
+
+Vec2 CutMesh::Vertex::get_normal(const Vec2& x) const {
+    if (!convex) return normal;
+    Vec2 d = x - position;
+    auto h = half_edge;
+    Vec2 normal0 = Vec2::Zero();
+    Vec2 normal1 = Vec2::Zero();
+    do {
+        if (!h->is_boundary) continue;
+        if (normal0 != Vec2::Zero()) {
+            normal1 = h->normal;
+            break;
+        }
+        normal0 = h->normal;
+    } while ((h = h->twin->next) != half_edge);
+    Vec2 perp = normal0 + normal1;
+    perp = Vec2(perp.y(), -perp.x());
+    if (perp.dot(d) * perp.dot(normal0) > 0) return normal0;
+    return normal1;
 }
