@@ -161,47 +161,39 @@ CutMesh::FaceRef CutMesh::get_enclosing_face(Vec2 x) const {
 void CutMesh::calculate_neighbor_nodes_and_boundaries_of_faces() {
     std::vector<bool> face_visited(faces_.size());
     std::vector<bool> is_neighbor_node(vertices_.size());
-    std::vector<bool> neighbor_node_sides(vertices_.size());
     std::vector<bool> is_neighbor_boundary(half_edges_.size());
     std::vector<CutMesh::FaceRef> neighbor_faces;
-    std::vector<bool> neighbor_face_sides;
-    std::queue<std::pair<CutMesh::FaceRef, bool>> q;
+    std::queue<CutMesh::FaceRef> q;
     for (auto cut_face = begin(faces_), faces_end = end(faces_);
          cut_face != faces_end; ++cut_face) {
         std::fill(begin(face_visited), end(face_visited), false);
         std::fill(begin(is_neighbor_node), end(is_neighbor_node), false);
-        std::fill(begin(neighbor_node_sides), end(neighbor_node_sides), false);
         std::fill(begin(is_neighbor_boundary), end(is_neighbor_boundary),
                   false);
         cut_face->neighbor_nodes.clear();
-        cut_face->neighbor_node_sides.clear();
         cut_face->neighbor_boundaries.clear();
         neighbor_faces.clear();
-        neighbor_face_sides.clear();
-        q.emplace(cut_face, true);
+        q.emplace(cut_face);
         while (!q.empty()) {
-            auto [face, side] = q.front();
+            auto face = q.front();
             q.pop();
             if (face_visited[face->id]) continue;
             face_visited[face->id] = true;
             neighbor_faces.emplace_back(face);
-            neighbor_face_sides.emplace_back(side);
             auto h = face->half_edge;
             do {
+                if (h->is_boundary) continue;
                 auto f = h->twin->face;
                 if (face_visited[f->id]) continue;
                 if (!is_neighbor_face(cut_face, f)) continue;
-                q.emplace(f, side ^ h->is_boundary);
+                q.emplace(f);
             } while ((h = h->next) != face->half_edge);
         }
-        for (int i = 0, n = static_cast<int>(neighbor_faces.size()); i < n;
-             ++i) {
-            auto f = neighbor_faces[i];
-            bool s = neighbor_face_sides[i];
+        for (auto f : neighbor_faces) {
             auto h = f->half_edge;
             do {
+                if (h->vertex->convex) cut_face->near_convex = true;
                 auto id = h->vertex->id;
-                if (s) neighbor_node_sides[id] = true;
                 if (is_neighbor_node[id]) continue;
                 is_neighbor_node[id] = true;
                 cut_face->neighbor_nodes.emplace_back(id);
@@ -209,35 +201,38 @@ void CutMesh::calculate_neighbor_nodes_and_boundaries_of_faces() {
 
             h = f->half_edge;
             do {
-                if (s && h->is_boundary && !is_neighbor_boundary[h->id]) {
+                if (h->is_boundary && !is_neighbor_boundary[h->id]) {
                     is_neighbor_boundary[h->id] = true;
                     cut_face->neighbor_boundaries.emplace_back(h->id);
                 }
             } while ((h = h->next) != f->half_edge);
         }
-        for (const auto& i : cut_face->neighbor_nodes)
-            cut_face->neighbor_node_sides.emplace_back(neighbor_node_sides[i]);
     }
 }
 
 void CutMesh::calculate_node_normals() {
     for (auto& vertex : vertices_) {
         if (vertex.on_boundary) continue;
-        vertex.normal = Vec2::Zero();
+        vertex.normal.setZero();
         auto face = vertex.half_edge->face;
-        const auto& neighbor_nodes = face->neighbor_nodes;
-        const auto& neighbor_node_sides = face->neighbor_node_sides;
+        if (face->near_convex) continue;
         Real w_sum = 0;
-        for (int i = 0,
-                 n_neighbor_nodes = static_cast<int>(neighbor_nodes.size());
-             i < n_neighbor_nodes; ++i) {
-            if (!neighbor_node_sides[i]) continue;
-            auto v = begin(vertices_) + neighbor_nodes[i];
-            if (!v->on_boundary) continue;
-            Vec2 d = vertex.position - v->position;
-            if (d.norm() > delta_x_ * 0.5) continue;
+        for (int id : face->neighbor_boundaries) {
+            auto h = begin(half_edges_) + id;
+            if (!h->is_boundary) continue;
+            auto v0 = h->vertex;
+            auto v1 = h->twin->vertex;
+            auto p0 = v0->position;
+            auto p1 = v1->position;
+            Real d = (vertex.position - p0).dot(h->normal);
+            if (d < 0 || d > 0.375 * delta_x_) continue;
+            Vec2 tangent = p1 - p0;
+            Real len = tangent.norm();
+            tangent.normalize();
+            Real t = tangent.dot(vertex.position - p0);
+            if (t < 0 || t > len) continue;
             auto w = interpolate(d);
-            vertex.normal += w * v->get_normal(v->position);
+            vertex.normal += w * h->normal;
             w_sum += w;
         }
         if (w_sum > 0) vertex.normal /= w_sum;
@@ -451,7 +446,7 @@ bool CutMesh::is_neighbor_face(CutMesh::FaceRef face0,
 }
 
 void CutMesh::Face::calculate_center() {
-    center = Vec2::Zero();
+    center.setZero();
     int cnt = 0;
     auto h = half_edge;
     do {
@@ -461,22 +456,24 @@ void CutMesh::Face::calculate_center() {
     center /= static_cast<Real>(cnt);
 }
 
-Vec2 CutMesh::Vertex::get_normal(const Vec2& x) const {
-    if (!convex) return normal;
-    Vec2 d = x - position;
+Vec2 CutMesh::Vertex::project_convex_velocity(const Vec2& x,
+                                              const Vec2& v) const {
+    if (!convex) return project(normal, v);
     auto h = half_edge;
     Vec2 normal0 = Vec2::Zero();
     Vec2 normal1 = Vec2::Zero();
     do {
         if (!h->is_boundary) continue;
-        if (normal0 != Vec2::Zero()) {
+        if (!normal0.isZero()) {
             normal1 = h->normal;
             break;
         }
         normal0 = h->normal;
     } while ((h = h->twin->next) != half_edge);
+    if (normal0.dot(v) > 0 || normal1.dot(v) > 0) return v;
     Vec2 perp = normal0 + normal1;
     perp = Vec2(perp.y(), -perp.x());
-    if (perp.dot(d) * perp.dot(normal0) > 0) return normal0;
-    return normal1;
+    Vec2 d = x - position;
+    if (perp.dot(d) * perp.dot(normal0) > 0) return project(normal0, v);
+    return project(normal1, v);
 }

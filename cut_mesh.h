@@ -57,7 +57,7 @@ class CutMesh {
         Vec2 normal = Vec2::Zero();
 
         bool convex = false;
-        Vec2 get_normal(const Vec2& x) const;
+        Vec2 project_convex_velocity(const Vec2& x, const Vec2& v) const;
     };
 
     struct Face {
@@ -65,8 +65,8 @@ class CutMesh {
         int id = 0;
         Vec2 center = Vec2::Zero();
         std::vector<int> neighbor_nodes;
-        std::vector<bool> neighbor_node_sides;
         std::vector<int> neighbor_boundaries;
+        bool near_convex = false;
         void calculate_center();
         [[nodiscard]] bool enclose(const Vec2& x) const;
     };

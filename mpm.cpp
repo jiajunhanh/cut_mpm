@@ -48,9 +48,9 @@ MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh, int quality, int material)
       row_size_(grid_size_ + 1),
       n_particles_(32 * quality_ * quality_),
       material_(material),
-      delta_t_(Real{2e-3} / static_cast<Real>(quality_)),
+      delta_t_(Real{1.6e-3} / static_cast<Real>(quality_)),
       delta_x_(Real{1.0} / static_cast<Real>(grid_size_)),
-      margin_(delta_x_ / 64),
+      margin_(delta_x_ / 128),
       particle_volume_(delta_x_ * delta_x_ * Real{0.25}),
       particle_density_(1.0),
       particle_mass_(particle_volume_ * particle_density_),
@@ -75,7 +75,7 @@ void MPM::initialize() {
 }
 
 void MPM::update() {
-#pragma omp parallel for default(none), shared(std::cout)
+#pragma omp parallel for default(none)
     for (GridNode& g : nodes_) {
         g.m = 0.0;
         g.v.setZero();
@@ -139,27 +139,41 @@ void MPM::update() {
 
         auto enclosing_face = cut_mesh_->get_enclosing_face(p.x);
         const auto& neighbor_nodes = enclosing_face->neighbor_nodes;
-        const auto& neighbor_node_sides = enclosing_face->neighbor_node_sides;
         int n_neighbor_nodes = static_cast<int>(neighbor_nodes.size());
-        Real weight_sum = 0.0;
-        std::vector<Real> weights(n_neighbor_nodes);
+        p.weight_sum = 0;
+        p.weights.assign(n_neighbor_nodes, 0);
         for (int i = 0; i < n_neighbor_nodes; ++i) {
-            if (!neighbor_node_sides[i]) continue;
-            weights[i] =
-                interpolate((nodes_[neighbor_nodes[i]].vertex->position - p.x) *
-                            grid_size_);
-            weight_sum += weights[i];
+            auto v = nodes_[neighbor_nodes[i]].vertex;
+            Vec2 d = v->position - p.x;
+            auto w = interpolate(d * grid_size_);
+            if (w <= 0) continue;
+            if (!enclosing_face->near_convex) {
+                p.weights[i] = w;
+                p.weight_sum += w;
+                continue;
+            }
+            auto min_t = kInf;
+            for (auto id : enclosing_face->neighbor_boundaries) {
+                auto h = begin(cut_mesh_->half_edges()) + id;
+                if (h->vertex == v || h->twin->vertex == v) continue;
+                auto p0 = h->vertex->position;
+                auto p1 = h->twin->vertex->position;
+                auto t = collision_time(p.x, d, p0, p1 - p0);
+                min_t = std::min(min_t, t);
+            }
+            if (min_t < 1) continue;
+            p.weights[i] = w;
+            p.weight_sum += w;
         }
         for (int i = 0; i < n_neighbor_nodes; ++i) {
-            if (!neighbor_node_sides[i]) continue;
-            if (weights[i] <= 0) continue;
+            if (p.weights[i] <= 0) continue;
             auto& g = nodes_[neighbor_nodes[i]];
             auto node_position = g.vertex->position;
             Vec3 distance(0.0, node_position.x() - p.x.x(),
                           node_position.y() - p.x.y());
             distance *= static_cast<Real>(grid_size_);
             distance.x() = 1.0;
-            Real weight = weights[i] / weight_sum;
+            Real weight = p.weights[i] / p.weight_sum;
             distance *= delta_x_;
             Vec2 v_add = weight * affine * distance;
 #pragma omp atomic
@@ -176,11 +190,8 @@ void MPM::update() {
         if (g.m <= 0) continue;
         g.v /= g.m;
         g.v += delta_t_ * kGravity * 30;
-        if (g.vertex->normal != Vec2::Zero() && !g.vertex->convex) {
-            auto dot = g.v.dot(g.vertex->normal);
-            dot = std::min(dot, Real{0});
-            g.v = g.v - dot * g.vertex->normal;
-        }
+        if (!g.vertex->normal.isZero() && !g.vertex->convex)
+            g.v = project(g.vertex->normal, g.v);
         if (g.vertex->on_boundary) continue;
         auto id = g.vertex->id;
         int x = id % row_size_;
@@ -221,33 +232,19 @@ void MPM::update() {
             }
         } else {
             const auto& neighbor_nodes = enclosing_face->neighbor_nodes;
-            const auto& neighbor_node_sides =
-                enclosing_face->neighbor_node_sides;
             int n_neighbor_nodes = static_cast<int>(neighbor_nodes.size());
-            Real weight_sum = 0.0;
-            std::vector<Real> weights(n_neighbor_nodes);
             for (int i = 0; i < n_neighbor_nodes; ++i) {
-                if (!neighbor_node_sides[i]) continue;
-                weights[i] = interpolate(
-                    (nodes_[neighbor_nodes[i]].vertex->position - p.x) *
-                    grid_size_);
-                weight_sum += weights[i];
-            }
-            for (int i = 0; i < n_neighbor_nodes; ++i) {
-                if (!neighbor_node_sides[i]) continue;
-                if (weights[i] <= 0) continue;
+                if (p.weights[i] <= 0) continue;
                 const auto& g = nodes_[neighbor_nodes[i]];
                 Vec3 distance(0.0, g.vertex->position.x() - p.x.x(),
                               g.vertex->position.y() - p.x.y());
                 distance *= static_cast<Real>(grid_size_);
                 distance.x() = 1.0;
-                Real weight = weights[i] / weight_sum;
+                Real weight = p.weights[i] / p.weight_sum;
                 distance *= delta_x_;
                 auto v = g.v;
-                if (g.vertex->convex) {
-                    auto normal = g.vertex->get_normal(p.x);
-                    v -= std::min(Real{0}, v.dot(normal)) * normal;
-                }
+                if (g.vertex->convex)
+                    v = g.vertex->project_convex_velocity(p.x, g.v);
                 new_v += weight * v;
                 new_C += weight * (v * distance.transpose());
                 new_M += weight * distance * distance.transpose();
@@ -289,7 +286,7 @@ void MPM::update() {
             }
             p.x += p.v * min_t;
             p.v *= (delta_t_ - min_t) / delta_t_;
-            p.v -= p.v.dot(normal) * normal;
+            p.v = project(normal, p.v);
         }
         p.v = (p.x - old_x) / delta_t_;
     }

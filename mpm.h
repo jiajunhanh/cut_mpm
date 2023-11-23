@@ -15,6 +15,9 @@ class MPM {
         Mat2 F = Mat2::Identity();
         Mat23 C = Mat23::Zero();
         Mat3 M_inv = Mat3::Zero();
+
+        Real weight_sum = 0;
+        std::vector<Real> weights;
     };
 
     struct GridNode {

@@ -7,6 +7,7 @@
 #include <cstdio>   // printf, fprintf
 #include <cstdlib>  // abort
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "cut_mesh.h"
@@ -413,7 +414,9 @@ static void show_cut_mesh() {
         ImVec2(main_viewport->WorkPos.x + 20, main_viewport->WorkPos.y + 20),
         ImGuiCond_FirstUseEver);
 
-    if (!ImGui::Begin("CUT_MPM")) {
+    std::string title = "CUT_MPM (" + std::to_string(ImGui::GetIO().Framerate) +
+                        " FPS)###CUT_MPM";
+    if (!ImGui::Begin(title.c_str())) {
         ImGui::End();
         return;
     }
@@ -580,7 +583,8 @@ static void show_cut_mesh() {
             mpm.initialize();
             simulating = true;
         }
-        for (int i = 0; i < static_cast<int>(std::pow(2, quality - 1)); ++i) {
+        for (int i = 0; i < static_cast<int>(std::pow(2, quality - 1)) * 5 / 4;
+             ++i) {
             mpm.update();
         }
         for (const auto& p : mpm.particles()) {
@@ -658,6 +662,15 @@ static void show_cut_mesh() {
             draw_list->AddLine(p0, p1, IM_COL32(0, 0, 0, 255), 2);
         }
     }*/
+    if (opt_simulation) {
+        for (const auto& p : mpm.particles()) {
+            float radius = quality > 4 ? 1.5 : 2;
+            draw_list->AddCircleFilled(
+                ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
+                       origin.y + static_cast<float>(p.x.y()) * canvas_width),
+                radius, IM_COL32(6, 133, 135, 255));
+        }
+    }
     if (!opt_construct_cut_mesh) {
         if (selected_half_edge != end(cut_mesh->half_edges())) {
             std::vector<ImVec2> points;

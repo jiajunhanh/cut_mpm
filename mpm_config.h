@@ -35,3 +35,7 @@ inline Real interpolate(Real x) {
 inline Real interpolate(Vec2 x) {
     return interpolate(x.x()) * interpolate(x.y());
 }
+
+inline Vec2 project(const Vec2& normal, const Vec2& v) {
+    return v - std::min(Real{0}, normal.dot(v)) * normal;
+}
