@@ -1,6 +1,6 @@
 #pragma once
 
-using Real = double;
+using Real = float;
 
 // constexpr int kQuality = 8;
 // constexpr int kGridSize = 8 * kQuality;

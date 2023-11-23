@@ -570,6 +570,30 @@ static void show_cut_mesh() {
         selected_face = end(cut_mesh->faces());
     }
 
+    if (opt_simulation) {
+        if (!simulating) {
+            if (boundary) vertices = scenarios[boundary];
+            *cut_mesh = CutMesh(vertices, quality);
+            selected_half_edge = end(cut_mesh->half_edges());
+            selected_face = end(cut_mesh->faces());
+            mpm = MPM(cut_mesh, quality, material);
+            mpm.initialize();
+            simulating = true;
+        }
+        for (int i = 0; i < static_cast<int>(std::pow(2, quality - 1)); ++i) {
+            mpm.update();
+        }
+        for (const auto& p : mpm.particles()) {
+            float radius = quality > 4 ? 1.5 : 2;
+            draw_list->AddCircleFilled(
+                ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
+                       origin.y + static_cast<float>(p.x.y()) * canvas_width),
+                radius, IM_COL32(6, 133, 135, 255));
+        }
+    } else {
+        simulating = false;
+    }
+
     // Draw grid + all lines in the canvas
     draw_list->PushClipRect(canvas_p0, canvas_p1, true);
     if (opt_draw_grid) {
@@ -680,29 +704,6 @@ static void show_cut_mesh() {
                 4, IM_COL32(255, 0, 0, 255));
         }
     }*/
-    if (opt_simulation) {
-        if (!simulating) {
-            if (boundary) vertices = scenarios[boundary];
-            *cut_mesh = CutMesh(vertices, quality);
-            selected_half_edge = end(cut_mesh->half_edges());
-            selected_face = end(cut_mesh->faces());
-            mpm = MPM(cut_mesh, quality, material);
-            mpm.initialize();
-            simulating = true;
-        }
-        for (int i = 0; i < static_cast<int>(std::pow(2, quality - 1)); ++i) {
-            mpm.update();
-        }
-        for (const auto& p : mpm.particles()) {
-            float radius = quality > 4 ? 1.5 : 2;
-            draw_list->AddCircleFilled(
-                ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
-                       origin.y + static_cast<float>(p.x.y()) * canvas_width),
-                radius, IM_COL32(6, 133, 135, 255));
-        }
-    } else {
-        simulating = false;
-    }
     draw_list->PopClipRect();
     ImGui::End();
 }

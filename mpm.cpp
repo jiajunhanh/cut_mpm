@@ -50,7 +50,7 @@ MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh, int quality, int material)
       material_(material),
       delta_t_(Real{2e-3} / static_cast<Real>(quality_)),
       delta_x_(Real{1.0} / static_cast<Real>(grid_size_)),
-      margin_(delta_x_ / 256),
+      margin_(delta_x_ / 64),
       particle_volume_(delta_x_ * delta_x_ * Real{0.25}),
       particle_density_(1.0),
       particle_mass_(particle_volume_ * particle_density_),
