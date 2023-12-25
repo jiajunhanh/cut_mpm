@@ -182,7 +182,7 @@ void CutMesh::calculate_neighbor_nodes_and_boundaries_of_faces() {
             neighbor_faces.emplace_back(face);
             auto h = face->half_edge;
             do {
-                if (h->is_boundary) continue;
+                // if (h->is_boundary) continue;
                 auto f = h->twin->face;
                 if (face_visited[f->id]) continue;
                 if (!is_neighbor_face(cut_face, f)) continue;

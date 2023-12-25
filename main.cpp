@@ -446,7 +446,13 @@ static void show_cut_mesh() {
                                          {Real{0.375}, Real{0.9}},
                                          {Real{0.675}, Real{0.4}},
                                          {Real{0.675}, Real{0.95}},
-                                         {Real{0.075}, Real{0.95}}}};
+                                         {Real{0.075}, Real{0.95}}},
+        std::vector<std::array<Real, 2>>{{Real{0.7}, Real{0.7}},
+                                         {Real{0.3}, Real{0.7}},
+                                         {Real{0.2}, Real{0.8}},
+                                         {Real{0.3}, Real{0.9}},
+                                         {Real{0.7}, Real{0.9}},
+                                         {Real{0.8}, Real{0.8}}}};
     static int quality = 4;
     static int boundary = 0;
     static int material = 0;
@@ -473,9 +479,12 @@ static void show_cut_mesh() {
     ImGui::SameLine();
     ImGui::SliderInt("Speed", &speed, 1, 8);
     ImGui::SameLine();
-    const char* boundaries[] = {"None", "Narrow gap", "Cutting",
+    const char* boundaries[] = {"None",
+                                "Narrow gap",
+                                "Cutting",
                                 "Sharp angle (liquid)",
-                                "Sharp angle (elastic)"};
+                                "Sharp angle (elastic)",
+                                "Polygon"};
     ImGui::Combo("Boundary", &boundary, boundaries, IM_ARRAYSIZE(boundaries));
     ImGui::PopItemWidth();
     ImGui::Checkbox("Draw grid", &opt_draw_grid);
@@ -598,8 +607,12 @@ static void show_cut_mesh() {
         int current_time_step = std::max(
             1, static_cast<int>(static_cast<float>(time_step) *
                                 static_cast<float>(std::pow(2, speed - 4))));
-        for (int i = 0; i < current_time_step; ++i) {
-            mpm.update();
+        static bool flag = false;
+        if (!flag) {
+            for (int i = 0; i < current_time_step * 130; ++i) {
+                mpm.update();
+            }
+            flag = true;
         }
         for (const auto& p : mpm.particles()) {
             draw_list->AddCircleFilled(

@@ -12,13 +12,13 @@ constexpr Real kLambda0 = kYoungModulus * kPoissonRatio /
                           ((1.0 + kPoissonRatio) * (1.0 - 2.0 * kPoissonRatio));
 const Vec2 kGravity(0.0, 1.0);
 
-Real random_real() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    // static std::mt19937 gen(42);
+/*Real random_real() {
+    // static std::random_device rd;
+    // static std::mt19937 gen(rd());
+    static std::mt19937 gen(13);
     static std::uniform_real_distribution<Real> dis(0.0, 1.0);
     return dis(gen);
-}
+}*/
 
 auto svd(const Mat2& m) {
     Eigen::JacobiSVD<Mat2, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(m);
@@ -68,9 +68,11 @@ MPM::MPM(const std::shared_ptr<CutMesh>& cut_mesh, int quality, int material)
 void MPM::initialize() {
     particles_.clear();
     particles_.resize(n_particles_);
+    std::mt19937 gen(13);
+    std::uniform_real_distribution<Real> dis(0.0, 1.0);
     for (Particle& p : particles_) {
-        p.x.x() = random_real() * Real{0.35} + Real{0.2};
-        p.x.y() = random_real() * Real{0.35} + Real{0.02};
+        p.x.x() = dis(gen) * Real{0.35} + Real{0.2};
+        p.x.y() = dis(gen) * Real{0.35} + Real{0.02};
     }
 }
 
@@ -147,7 +149,7 @@ void MPM::update() {
                 p.weight_sum += w;
                 continue;
             }
-            auto min_t = kInf;
+            /*auto min_t = kInf;
             for (auto id : enclosing_face->neighbor_boundaries) {
                 auto h = begin(cut_mesh_->half_edges()) + id;
                 if (h->vertex == v || h->twin->vertex == v) continue;
@@ -156,7 +158,7 @@ void MPM::update() {
                 auto t = collision_time(p.x, d, p0, p1 - p0);
                 min_t = std::min(min_t, t);
             }
-            if (min_t < 1) continue;
+            if (min_t < 1) continue;*/
             p.weights[i] = w;
             p.weight_sum += w;
         }
@@ -185,8 +187,8 @@ void MPM::update() {
         if (g.m <= 0) continue;
         g.v /= g.m;
         g.v += delta_t_ * kGravity * 30;
-        if (!g.vertex->normal.isZero() && !g.vertex->convex)
-            g.v = project(g.vertex->normal, g.v);
+        /*if (!g.vertex->normal.isZero() && !g.vertex->convex)
+            g.v = project(g.vertex->normal, g.v);*/
         if (g.vertex->on_boundary) continue;
         auto id = g.vertex->id;
         int x = id % row_size_;
@@ -238,8 +240,8 @@ void MPM::update() {
                 Real weight = p.weights[i] / p.weight_sum;
                 distance *= delta_x_;
                 auto v = g.v;
-                if (g.vertex->convex)
-                    v = g.vertex->project_convex_velocity(p.x, g.v);
+                /*if (g.vertex->convex)
+                    v = g.vertex->project_convex_velocity(p.x, g.v);*/
                 new_v += weight * v;
                 new_C += weight * (v * distance.transpose());
                 new_M += weight * distance * distance.transpose();
@@ -248,10 +250,8 @@ void MPM::update() {
         p.v = new_v;
         p.M_inv = new_M.inverse();
         p.C = new_C * new_M.inverse();
-        if (enclosing_face->neighbor_boundaries.empty()) {
-            p.x += p.v * delta_t_;
-            continue;
-        }
+        p.x += p.v * delta_t_;
+        continue;
 
         Vec2 old_x = p.x;
         for (int i = 0; i < 4; ++i) {
