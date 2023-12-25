@@ -216,7 +216,7 @@ void CutMesh::calculate_node_normals() {
         vertex.normal.setZero();
         auto face = vertex.half_edge->face;
         if (face->near_convex) continue;
-        Real w_sum = 0;
+        // Real w_sum = 0;
         for (int id : face->neighbor_boundaries) {
             auto h = begin(half_edges_) + id;
             if (!h->is_boundary) continue;
@@ -225,7 +225,7 @@ void CutMesh::calculate_node_normals() {
             auto p0 = v0->position;
             auto p1 = v1->position;
             Real d = (vertex.position - p0).dot(h->normal);
-            if (d < 0 || d > 0.375 * delta_x_) continue;
+            if (d < 0 || d > 0.5 * delta_x_) continue;
             Vec2 tangent = p1 - p0;
             Real len = tangent.norm();
             tangent.normalize();
@@ -233,9 +233,10 @@ void CutMesh::calculate_node_normals() {
             if (t < 0 || t > len) continue;
             auto w = interpolate(d);
             vertex.normal += w * h->normal;
-            w_sum += w;
+            // w_sum += w;
         }
-        if (w_sum > 0) vertex.normal /= w_sum;
+        // if (w_sum > 0) vertex.normal /= w_sum;
+        if (!vertex.normal.isZero()) vertex.normal.normalize();
     }
 }
 

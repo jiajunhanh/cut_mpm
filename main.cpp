@@ -450,6 +450,10 @@ static void show_cut_mesh() {
     static int quality = 4;
     static int boundary = 0;
     static int material = 0;
+    static int grid_size = 8 * static_cast<int>(std::pow(2, quality - 1));
+    static int time_step = static_cast<int>(std::pow(2, quality - 1)) * 5 / 4;
+    static int speed = 4;
+    static float radius = quality > 4 ? 1.5 : 2;
     static std::vector<std::array<Real, 2>> vertices = scenarios[boundary];
     static auto cut_mesh = std::make_shared<CutMesh>(vertices, quality);
     static MPM mpm(cut_mesh, quality, material);
@@ -464,8 +468,10 @@ static void show_cut_mesh() {
     static auto selected_half_edge = end(cut_mesh->half_edges());
     static auto selected_face = end(cut_mesh->faces());
 
-    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.25f);
+    ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.2f);
     ImGui::SliderInt("Quality", &quality, 1, 8);
+    ImGui::SameLine();
+    ImGui::SliderInt("Speed", &speed, 1, 8);
     ImGui::SameLine();
     const char* boundaries[] = {"None", "Narrow gap", "Cutting",
                                 "Sharp angle (liquid)",
@@ -569,6 +575,9 @@ static void show_cut_mesh() {
     if (opt_construct_cut_mesh) {
         if (boundary) vertices = scenarios[boundary];
         *cut_mesh = CutMesh(vertices, quality);
+        grid_size = 8 * static_cast<int>(std::pow(2, quality - 1));
+        time_step = static_cast<int>(std::pow(2, quality - 1)) * 5 / 4;
+        radius = quality > 4 ? 1.5 : 2;
         selected_half_edge = end(cut_mesh->half_edges());
         selected_face = end(cut_mesh->faces());
     }
@@ -577,18 +586,22 @@ static void show_cut_mesh() {
         if (!simulating) {
             if (boundary) vertices = scenarios[boundary];
             *cut_mesh = CutMesh(vertices, quality);
+            grid_size = 8 * static_cast<int>(std::pow(2, quality - 1));
+            time_step = static_cast<int>(std::pow(2, quality - 1)) * 5 / 4;
+            radius = quality > 4 ? 1.5 : 2;
             selected_half_edge = end(cut_mesh->half_edges());
             selected_face = end(cut_mesh->faces());
             mpm = MPM(cut_mesh, quality, material);
             mpm.initialize();
             simulating = true;
         }
-        for (int i = 0; i < static_cast<int>(std::pow(2, quality - 1)) * 5 / 4;
-             ++i) {
+        int current_time_step = std::max(
+            1, static_cast<int>(static_cast<float>(time_step) *
+                                static_cast<float>(std::pow(2, speed - 4))));
+        for (int i = 0; i < current_time_step; ++i) {
             mpm.update();
         }
         for (const auto& p : mpm.particles()) {
-            float radius = quality > 4 ? 1.5 : 2;
             draw_list->AddCircleFilled(
                 ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
                        origin.y + static_cast<float>(p.x.y()) * canvas_width),
@@ -601,7 +614,6 @@ static void show_cut_mesh() {
     // Draw grid + all lines in the canvas
     draw_list->PushClipRect(canvas_p0, canvas_p1, true);
     if (opt_draw_grid) {
-        int grid_size = 8 * static_cast<int>(std::pow(2, quality - 1));
         const float grid_step = canvas_width / static_cast<float>(grid_size);
         for (int i = 1; i < grid_size; ++i) {
             draw_list->AddLine(
@@ -664,7 +676,6 @@ static void show_cut_mesh() {
     }*/
     if (opt_simulation) {
         for (const auto& p : mpm.particles()) {
-            float radius = quality > 4 ? 1.5 : 2;
             draw_list->AddCircleFilled(
                 ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
                        origin.y + static_cast<float>(p.x.y()) * canvas_width),

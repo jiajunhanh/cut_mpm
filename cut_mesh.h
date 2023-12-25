@@ -57,7 +57,8 @@ class CutMesh {
         Vec2 normal = Vec2::Zero();
 
         bool convex = false;
-        Vec2 project_convex_velocity(const Vec2& x, const Vec2& v) const;
+        [[nodiscard]] Vec2 project_convex_velocity(const Vec2& x,
+                                                   const Vec2& v) const;
     };
 
     struct Face {

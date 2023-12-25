@@ -99,14 +99,9 @@ void MPM::update() {
             PF = Mat2::Identity() * lambda * J * (J - 1.0);
             p.F = Mat2::Identity() * std::sqrt(J);
         }
-        Mat3 M_inv = p.M_inv;
-        Mat23 affine = Mat23::Zero();
-        for (int i = 0; i < 2; ++i) {
-            for (int j = 0; j < 2; ++j)
-                affine.row(i) += M_inv.row(j + 1) * PF(i, j);
-        }
-        affine *= -delta_t_ * particle_volume_;
-        affine += particle_mass_ * p.C;
+        Mat23 affine =
+            -delta_t_ * particle_volume_ * PF * p.M_inv.block<2, 3>(1, 0) +
+            particle_mass_ * p.C;
         Vec2i base = ((p.x * inv_delta_x_).array() - 0.5).cast<int>();
         if (!cut_mesh_->grid(base[1], base[0]).near_boundary) {
             Vec2 fx = p.x * inv_delta_x_ - base.cast<Real>();
