@@ -182,7 +182,9 @@ void CutMesh::calculate_neighbor_nodes_and_boundaries_of_faces() {
             neighbor_faces.emplace_back(face);
             auto h = face->half_edge;
             do {
-                // if (h->is_boundary) continue;
+                if constexpr (boundary_condition) {
+                    if (h->is_boundary) continue;
+                }
                 auto f = h->twin->face;
                 if (face_visited[f->id]) continue;
                 if (!is_neighbor_face(cut_face, f)) continue;
@@ -211,11 +213,12 @@ void CutMesh::calculate_neighbor_nodes_and_boundaries_of_faces() {
 }
 
 void CutMesh::calculate_node_normals() {
+    if (!normal_scattering) return;
     for (auto& vertex : vertices_) {
         if (vertex.on_boundary) continue;
         vertex.normal.setZero();
         auto face = vertex.half_edge->face;
-        if (face->near_convex) continue;
+        if (cutting && face->near_convex) continue;
         // Real w_sum = 0;
         for (int id : face->neighbor_boundaries) {
             auto h = begin(half_edges_) + id;
@@ -225,7 +228,7 @@ void CutMesh::calculate_node_normals() {
             auto p0 = v0->position;
             auto p1 = v1->position;
             Real d = (vertex.position - p0).dot(h->normal);
-            if (d < 0 || d > 0.5 * delta_x_) continue;
+            if (d < 0 || d > (cutting ? 0.5 : 1.0) * delta_x_) continue;
             Vec2 tangent = p1 - p0;
             Real len = tangent.norm();
             tangent.normalize();

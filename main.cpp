@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>   // printf, fprintf
 #include <cstdlib>  // abort
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -421,7 +422,7 @@ static void show_cut_mesh() {
         return;
     }
 
-    constexpr Real gap = 0.0039;
+    constexpr Real gap = 1e-4;
     static std::vector<std::vector<std::array<Real, 2>>> scenarios{
         std::vector<std::array<Real, 2>>{},
         std::vector<std::array<Real, 2>>{{Real{0.3} - gap / 2, Real{0.6}},
@@ -432,9 +433,9 @@ static void show_cut_mesh() {
                                          {Real{0.3} + gap / 2, Real{0.6}},
                                          {Real{0.95}, Real{0.95}},
                                          {Real{0.05}, Real{0.95}}},
-        std::vector<std::array<Real, 2>>{{Real{0.375}, Real{0.59}},
-                                         {Real{0.325}, Real{0.95}},
-                                         {Real{0.425}, Real{0.95}}},
+        std::vector<std::array<Real, 2>>{{Real{0.368}, Real{0.595}},
+                                         {Real{0.275}, Real{0.95}},
+                                         {Real{0.475}, Real{0.95}}},
         std::vector<std::array<Real, 2>>{{Real{0.5}, Real{0.95}},
                                          {Real{0.6}, Real{0.5}},
                                          {Real{0.999}, Real{0.4}},
@@ -452,10 +453,14 @@ static void show_cut_mesh() {
                                          {Real{0.2}, Real{0.8}},
                                          {Real{0.3}, Real{0.9}},
                                          {Real{0.7}, Real{0.9}},
-                                         {Real{0.8}, Real{0.8}}}};
+                                         {Real{0.8}, Real{0.8}}},
+        std::vector<std::array<Real, 2>>{{Real{0.9}, Real{0.8}},
+                                         {Real{0.1}, Real{0.8}},
+                                         {Real{0.1}, Real{0.9}},
+                                         {Real{0.9}, Real{0.9}}}};
     static int quality = 4;
-    static int boundary = 0;
-    static int material = 0;
+    static int boundary = 6;
+    static int material = 1;
     static int grid_size = 8 * static_cast<int>(std::pow(2, quality - 1));
     static int time_step = static_cast<int>(std::pow(2, quality - 1)) * 5 / 4;
     static int speed = 4;
@@ -463,12 +468,12 @@ static void show_cut_mesh() {
     static std::vector<std::array<Real, 2>> vertices = scenarios[boundary];
     static auto cut_mesh = std::make_shared<CutMesh>(vertices, quality);
     static MPM mpm(cut_mesh, quality, material);
-    static bool opt_draw_grid = true;
+    static bool opt_draw_grid = false;
     static bool opt_construct_cut_mesh = true;
     // static bool opt_draw_cut_vertices = false;
     // static bool opt_draw_cut_edges = false;
     static bool opt_draw_original_lines = true;
-    static bool opt_simulation = false;
+    static bool opt_simulation = pause;
     static bool adding_line = false;
     static bool simulating = false;
     static auto selected_half_edge = end(cut_mesh->half_edges());
@@ -484,7 +489,8 @@ static void show_cut_mesh() {
                                 "Cutting",
                                 "Sharp angle (liquid)",
                                 "Sharp angle (elastic)",
-                                "Polygon"};
+                                "Polygon",
+                                "Rectangle"};
     ImGui::Combo("Boundary", &boundary, boundaries, IM_ARRAYSIZE(boundaries));
     ImGui::PopItemWidth();
     ImGui::Checkbox("Draw grid", &opt_draw_grid);
@@ -509,6 +515,7 @@ static void show_cut_mesh() {
     ImGui::Checkbox("Simulation", &opt_simulation);
     ImGui::SameLine();
     const char* materials[] = {"Liquid", "Elastic"};
+    ImU32 colors[] = {IM_COL32(6, 133, 135, 255), IM_COL32(237, 85, 59, 255)};
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.25f);
     ImGui::Combo("Material", &material, materials, IM_ARRAYSIZE(materials));
     // if (opt_construct_cut_mesh) opt_simulation = false;
@@ -608,18 +615,22 @@ static void show_cut_mesh() {
             1, static_cast<int>(static_cast<float>(time_step) *
                                 static_cast<float>(std::pow(2, speed - 4))));
         static bool flag = false;
+        // static int frame = 0;
+        static std::ofstream energy_ofs("energy.txt");
         if (!flag) {
-            for (int i = 0; i < current_time_step * 130; ++i) {
+            for (int i = 0;
+                 i < current_time_step * (pause ? frames_before_pause : 1);
+                 ++i) {
                 mpm.update();
             }
-            flag = true;
+            flag = pause;
         }
-        for (const auto& p : mpm.particles()) {
-            draw_list->AddCircleFilled(
-                ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
-                       origin.y + static_cast<float>(p.x.y()) * canvas_width),
-                radius, IM_COL32(6, 133, 135, 255));
-        }
+        double energy = 0;
+        for (const auto& p : mpm.particles())
+            energy += 0.5 * mpm.particle_mass_ * p.v.squaredNorm();
+        energy_ofs << energy << '\n';
+        // ++frame;
+        // if (frame >= 1200) exit(0);
     } else {
         simulating = false;
     }
@@ -692,7 +703,7 @@ static void show_cut_mesh() {
             draw_list->AddCircleFilled(
                 ImVec2(origin.x + static_cast<float>(p.x.x()) * canvas_width,
                        origin.y + static_cast<float>(p.x.y()) * canvas_width),
-                radius, IM_COL32(6, 133, 135, 255));
+                radius, colors[material]);
         }
     }
     if (!opt_construct_cut_mesh) {

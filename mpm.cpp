@@ -70,9 +70,19 @@ void MPM::initialize() {
     particles_.resize(n_particles_);
     std::mt19937 gen(13);
     std::uniform_real_distribution<Real> dis(0.0, 1.0);
-    for (Particle& p : particles_) {
-        p.x.x() = dis(gen) * Real{0.35} + Real{0.2};
-        p.x.y() = dis(gen) * Real{0.35} + Real{0.02};
+    if constexpr (!rotate) {
+        for (Particle& p : particles_) {
+            p.x.x() = dis(gen) * Real{0.35} + Real{0.2};
+            p.x.y() = dis(gen) * Real{0.35} + Real{0.02};
+        }
+    } else {
+        for (Particle& p : particles_) {
+            Vec2 v(dis(gen), dis(gen));
+            v *= Real{0.35};
+            v = Rot(kPi / 4).derived() * v;
+            p.x.x() = v.x() + Real{0.5};
+            p.x.y() = v.y() + Real{0.01};
+        }
     }
 }
 
@@ -101,6 +111,7 @@ void MPM::update() {
             PF = Mat2::Identity() * lambda * J * (J - 1.0);
             p.F = Mat2::Identity() * std::sqrt(J);
         }
+        // p.C.block<2, 2>(0, 1).setZero();
         Mat23 affine =
             -delta_t_ * particle_volume_ * PF * p.M_inv.block<2, 3>(1, 0) +
             particle_mass_ * p.C;
@@ -144,21 +155,23 @@ void MPM::update() {
             Vec2 d = v->position - p.x;
             auto w = interpolate(d * grid_size_);
             if (w <= 0) continue;
-            if (!enclosing_face->near_convex) {
+            if (!enclosing_face->near_convex || !cutting) {
                 p.weights[i] = w;
                 p.weight_sum += w;
                 continue;
             }
-            /*auto min_t = kInf;
-            for (auto id : enclosing_face->neighbor_boundaries) {
-                auto h = begin(cut_mesh_->half_edges()) + id;
-                if (h->vertex == v || h->twin->vertex == v) continue;
-                auto p0 = h->vertex->position;
-                auto p1 = h->twin->vertex->position;
-                auto t = collision_time(p.x, d, p0, p1 - p0);
-                min_t = std::min(min_t, t);
+            if constexpr (boundary_condition) {
+                auto min_t = kInf;
+                for (auto id : enclosing_face->neighbor_boundaries) {
+                    auto h = begin(cut_mesh_->half_edges()) + id;
+                    if (h->vertex == v || h->twin->vertex == v) continue;
+                    auto p0 = h->vertex->position;
+                    auto p1 = h->twin->vertex->position;
+                    auto t = collision_time(p.x, d, p0, p1 - p0);
+                    min_t = std::min(min_t, t);
+                }
+                if (min_t < 1) continue;
             }
-            if (min_t < 1) continue;*/
             p.weights[i] = w;
             p.weight_sum += w;
         }
@@ -187,8 +200,10 @@ void MPM::update() {
         if (g.m <= 0) continue;
         g.v /= g.m;
         g.v += delta_t_ * kGravity * 30;
-        /*if (!g.vertex->normal.isZero() && !g.vertex->convex)
-            g.v = project(g.vertex->normal, g.v);*/
+        if constexpr (boundary_condition) {
+            if (!g.vertex->normal.isZero() && (!cutting || !g.vertex->convex))
+                g.v = project(g.vertex->normal, g.v);
+        }
         if (g.vertex->on_boundary) continue;
         auto id = g.vertex->id;
         int x = id % row_size_;
@@ -240,8 +255,10 @@ void MPM::update() {
                 Real weight = p.weights[i] / p.weight_sum;
                 distance *= delta_x_;
                 auto v = g.v;
-                /*if (g.vertex->convex)
-                    v = g.vertex->project_convex_velocity(p.x, g.v);*/
+                if constexpr (boundary_condition && cutting) {
+                    if (g.vertex->convex)
+                        v = g.vertex->project_convex_velocity(p.x, g.v);
+                }
                 new_v += weight * v;
                 new_C += weight * (v * distance.transpose());
                 new_M += weight * distance * distance.transpose();
@@ -250,8 +267,11 @@ void MPM::update() {
         p.v = new_v;
         p.M_inv = new_M.inverse();
         p.C = new_C * new_M.inverse();
-        p.x += p.v * delta_t_;
-        continue;
+        if (!boundary_condition || !collision ||
+            enclosing_face->neighbor_boundaries.empty()) {
+            p.x += p.v * delta_t_;
+            continue;
+        }
 
         Vec2 old_x = p.x;
         for (int i = 0; i < 4; ++i) {

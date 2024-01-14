@@ -34,7 +34,6 @@ class MPM {
         return particles_;
     }
 
-   private:
     int quality_;
     int grid_size_;
     int row_size_;
@@ -48,6 +47,7 @@ class MPM {
     Real particle_mass_;
     Real inv_delta_x_;
 
+   private:
     std::shared_ptr<CutMesh> cut_mesh_;
     std::vector<Particle> particles_;
     std::vector<GridNode> nodes_;

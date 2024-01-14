@@ -1,5 +1,12 @@
 #pragma once
 
+constexpr bool boundary_condition = true;
+constexpr bool rotate = true;
+constexpr bool normal_scattering = false;
+constexpr bool cutting = true;
+constexpr bool collision = false;
+constexpr bool pause = true;
+constexpr int frames_before_pause = 120;
 using Real = double;
 
 // constexpr int kQuality = 8;
@@ -12,6 +19,7 @@ constexpr Real kKernelRange = 1.5;
 constexpr Real kInf = std::numeric_limits<Real>::infinity();
 // constexpr Real kMargin = kDeltaX / 32;
 //  constexpr Real kInvDeltaX = kGridSize;
+constexpr Real kPi = 3.141592653589793;
 
 using Vec2i = Eigen::Vector2i;
 using Mat23 = Eigen::Matrix<Real, 2, 3>;
@@ -23,6 +31,8 @@ using Mat2 = std::conditional_t<std::is_same_v<Real, float>, Eigen::Matrix2f,
                                 Eigen::Matrix2d>;
 using Mat3 = std::conditional_t<std::is_same_v<Real, float>, Eigen::Matrix3f,
                                 Eigen::Matrix3d>;
+using Rot = std::conditional_t<std::is_same_v<Real, float>, Eigen::Rotation2Df,
+                               Eigen::Rotation2Dd>;
 
 inline Real interpolate(Real x) {
     x = std::abs(x);
